@@ -4,6 +4,7 @@ import { PropertyStatus, UserRole } from '@prisma/client';
 import { prisma } from '../../config/prisma.js';
 import { authenticate, allowRoles } from '../../middleware/auth.js';
 import { asyncHandler } from '../../utils/async-handler.js';
+import { notifyUserSafely } from '../notifications/notifications.service.js';
 
 export const adminRouter = Router();
 adminRouter.use(authenticate, allowRoles(UserRole.ADMIN));
@@ -36,6 +37,7 @@ adminRouter.patch('/properties/:id/review', asyncHandler(async (req, res) => {
   if (current.status !== PropertyStatus.PENDING_REVIEW) { res.status(409).json({ message: 'Only pending listings can be reviewed.' }); return; }
   if (parsed.data.decision === 'REJECTED' && !parsed.data.reason) { res.status(400).json({ message: 'A rejection reason is required.' }); return; }
   const data = await prisma.property.update({ where: { id: current.id }, data: { status: parsed.data.decision } });
+  await notifyUserSafely(current.ownerId, 'LISTING_REVIEWED', parsed.data.decision === 'PUBLISHED' ? 'Your listing was approved' : 'Your listing was rejected', parsed.data.decision === 'PUBLISHED' ? 'Your listing is now visible to renters.' : `Reason: ${parsed.data.reason}`);
   res.json({ message: parsed.data.decision === 'PUBLISHED' ? 'Listing published after moderation. This is not proof of ownership or authority to rent.' : 'Listing rejected.', data });
 }));
 

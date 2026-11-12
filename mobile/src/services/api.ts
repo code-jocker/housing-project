@@ -113,3 +113,14 @@ export async function setPropertyAvailability(id: string, available: boolean) {
 export async function reportProperty(propertyId: string, reason: 'SUSPECTED_SCAM' | 'FALSE_INFORMATION' | 'DUPLICATE_LISTING' | 'UNAUTHORIZED_AGENT' | 'OTHER', details?: string) {
   return request('/api/v1/marketplace/properties/' + encodeURIComponent(propertyId) + '/reports', { method: 'POST', body: JSON.stringify({ reason, ...(details ? { details } : {}) }) });
 }
+
+export type AppNotification = { id: string; type: string; title: string; body: string; readAt: string | null; createdAt: string };
+export async function getNotifications(): Promise<{ data: AppNotification[]; unread: number }> {
+  return request('/api/v1/notifications?limit=40');
+}
+export async function markNotificationRead(id: string) {
+  return request('/api/v1/notifications/' + encodeURIComponent(id) + '/read', { method: 'PATCH' });
+}
+export async function markAllNotificationsRead() {
+  return request('/api/v1/notifications/read-all', { method: 'PATCH' });
+}

@@ -91,6 +91,9 @@ test('tenant, landlord and admin marketplace journey', async () => {
   const viewing = await request(app).post('/api/v1/marketplace/viewings').set('Authorization', `Bearer ${tenantToken}`).send({ propertyId, preferredAt });
   assert.equal(viewing.status, 201);
   const viewingId = viewing.body.data.id;
+  const landlordNotifications = await request(app).get('/api/v1/notifications').set('Authorization', `Bearer ${landlordToken}`);
+  assert.equal(landlordNotifications.status, 200);
+  assert.ok(landlordNotifications.body.data.some((item: { type: string }) => item.type === 'VIEWING_REQUEST'));
 
   const ownerViewings = await request(app).get('/api/v1/marketplace/viewings').set('Authorization', `Bearer ${landlordToken}`);
   assert.equal(ownerViewings.status, 200);
@@ -102,10 +105,16 @@ test('tenant, landlord and admin marketplace journey', async () => {
   const tenantViewings = await request(app).get('/api/v1/marketplace/viewings').set('Authorization', `Bearer ${tenantToken}`);
   assert.equal(tenantViewings.status, 200);
   assert.equal(tenantViewings.body.data[0].property.owner.phone, landlordPhone);
+  const tenantNotifications = await request(app).get('/api/v1/notifications').set('Authorization', `Bearer ${tenantToken}`);
+  assert.ok(tenantNotifications.body.data.some((item: { type: string }) => item.type === 'VIEWING_UPDATE'));
 
   const report = await request(app).post(`/api/v1/marketplace/properties/${propertyId}/reports`).set('Authorization', `Bearer ${tenantToken}`).send({ reason: 'FALSE_INFORMATION', details: 'Integration test report.' });
   assert.equal(report.status, 201);
   const reports = await request(app).get('/api/v1/admin/reports').set('Authorization', `Bearer ${adminToken}`);
   assert.equal(reports.status, 200);
   assert.ok(reports.body.data.some((item: { id: string }) => item.id === report.body.data.id));
+  const adminNotifications = await request(app).get('/api/v1/notifications').set('Authorization', `Bearer ${adminToken}`);
+  assert.ok(adminNotifications.body.data.some((item: { type: string }) => item.type === 'PROPERTY_REPORTED'));
+  const markedRead = await request(app).patch('/api/v1/notifications/read-all').set('Authorization', `Bearer ${adminToken}`);
+  assert.equal(markedRead.status, 200);
 });

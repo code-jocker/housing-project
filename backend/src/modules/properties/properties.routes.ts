@@ -4,6 +4,7 @@ import { PropertyStatus, UserRole } from '@prisma/client';
 import { prisma } from '../../config/prisma.js';
 import { authenticate, allowRoles } from '../../middleware/auth.js';
 import { asyncHandler } from '../../utils/async-handler.js';
+import { notifyAdminsSafely } from '../notifications/notifications.service.js';
 
 export const propertiesRouter = Router();
 const propertySchema = z.object({
@@ -55,6 +56,7 @@ propertiesRouter.post('/', authenticate, allowRoles(UserRole.LANDLORD, UserRole.
   if (!parsed.success) { res.status(400).json({ message: 'Invalid property details.', errors: parsed.error.flatten() }); return; }
   const { images, ...data } = parsed.data;
   const property = await prisma.property.create({ data: { ...data, ownerId: req.auth!.userId, status: PropertyStatus.PENDING_REVIEW, images: { create: images.map((url, sortOrder) => ({ url, sortOrder })) } }, include: { images: true } });
+  await notifyAdminsSafely('LISTING_SUBMITTED', 'New listing submitted', `${property.title} is waiting for moderation.`);
   res.status(201).json({ message: 'Property submitted for review.', data: property });
 }));
 
@@ -78,5 +80,6 @@ propertiesRouter.patch('/:id/availability', authenticate, allowRoles(UserRole.LA
   if (current.ownerId !== req.auth!.userId && req.auth!.role !== UserRole.ADMIN) { res.status(403).json({ message: 'You cannot update this property.' }); return; }
   const status = parsed.data.available ? PropertyStatus.PENDING_REVIEW : PropertyStatus.RENTED;
   const data = await prisma.property.update({ where: { id: current.id }, data: { available: parsed.data.available, status } });
+  if (parsed.data.available) await notifyAdminsSafely('LISTING_RELISTED', 'Listing submitted for review', `${data.title} was submitted for review again.`);
   res.json({ message: parsed.data.available ? 'Listing submitted for review before becoming available again.' : 'Listing marked as rented/unavailable.', data });
 }));

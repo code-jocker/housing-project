@@ -4,6 +4,7 @@ import { PropertyStatus, UserRole, ViewingStatus } from '@prisma/client';
 import { prisma } from '../../config/prisma.js';
 import { authenticate, allowRoles } from '../../middleware/auth.js';
 import { asyncHandler } from '../../utils/async-handler.js';
+import { notifyAdminsSafely, notifyUserSafely } from '../notifications/notifications.service.js';
 
 export const marketplaceRouter = Router();
 marketplaceRouter.use(authenticate);
@@ -49,12 +50,13 @@ marketplaceRouter.post('/viewings', allowRoles(UserRole.TENANT), asyncHandler(as
   if (!parsed.success) { res.status(400).json({ message: 'Invalid viewing request.', errors: parsed.error.flatten() }); return; }
   const preferredAt = new Date(parsed.data.preferredAt);
   if (preferredAt <= new Date()) { res.status(400).json({ message: 'Choose a future viewing date and time.' }); return; }
-  const property = await prisma.property.findFirst({ where: { id: parsed.data.propertyId, status: PropertyStatus.PUBLISHED, available: true }, select: { id: true, ownerId: true } });
+  const property = await prisma.property.findFirst({ where: { id: parsed.data.propertyId, status: PropertyStatus.PUBLISHED, available: true }, select: { id: true, ownerId: true, title: true } });
   if (!property) { res.status(404).json({ message: 'This property is no longer available.' }); return; }
   if (property.ownerId === req.auth!.userId) { res.status(400).json({ message: 'You cannot request a viewing for your own property.' }); return; }
   const duplicate = await prisma.viewingRequest.findFirst({ where: { tenantId: req.auth!.userId, propertyId: property.id, status: { in: [ViewingStatus.REQUESTED, ViewingStatus.ACCEPTED] } } });
   if (duplicate) { res.status(409).json({ message: 'You already have an active viewing request for this property.' }); return; }
   const data = await prisma.viewingRequest.create({ data: { tenantId: req.auth!.userId, propertyId: property.id, preferredAt, message: parsed.data.message }, include: { property: { select: { id: true, title: true, district: true, sector: true } } } });
+  await notifyUserSafely(property.ownerId, 'VIEWING_REQUEST', 'New viewing request', `A tenant requested a viewing for ${property.title}.`);
   res.status(201).json({ message: 'Viewing request sent to the listing owner.', data });
 }));
 
@@ -67,7 +69,7 @@ marketplaceRouter.get('/viewings', asyncHandler(async (req, res) => {
   const data = await prisma.viewingRequest.findMany({
     where,
     include: {
-      property: { select: { id: true, title: true, district: true, sector: true, ownerId: true } },
+      property: { select: { id: true, title: true, district: true, sector: true, ownerId: true, owner: { select: { id: true, fullName: true, phone: true } } } },
       tenant: { select: { id: true, fullName: true, phone: true } },
     },
     orderBy: { createdAt: 'desc' },
@@ -98,6 +100,8 @@ marketplaceRouter.patch('/viewings/:id', asyncHandler(async (req, res) => {
     res.status(409).json({ message: 'This viewing request can no longer be changed to that status.' }); return;
   }
   const data = await prisma.viewingRequest.update({ where: { id: current.id }, data: { status: next } });
+  const recipientId = isTenant ? current.property.ownerId : current.tenantId;
+  await notifyUserSafely(recipientId, 'VIEWING_UPDATE', 'Viewing request updated', `A viewing request was marked ${next.toLowerCase()}.`);
   res.json({ message: 'Viewing request updated.', data });
 }));
 
@@ -114,5 +118,6 @@ marketplaceRouter.post('/properties/:propertyId/reports', allowRoles(UserRole.TE
   const existing = await prisma.propertyReport.findFirst({ where: { propertyId: property.id, reporterId: req.auth!.userId, resolved: false } });
   if (existing) { res.status(409).json({ message: 'You already have an open report for this listing.' }); return; }
   const data = await prisma.propertyReport.create({ data: { propertyId: property.id, reporterId: req.auth!.userId, reason: parsed.data.reason, details: parsed.data.details } });
+  await notifyAdminsSafely('PROPERTY_REPORTED', 'Property reported', `A listing was reported for ${parsed.data.reason.toLowerCase().replaceAll('_', ' ')}.`);
   res.status(201).json({ message: 'Report submitted for review.', data: { id: data.id, createdAt: data.createdAt } });
 }));
