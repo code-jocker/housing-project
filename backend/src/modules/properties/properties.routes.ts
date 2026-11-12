@@ -30,8 +30,7 @@ propertiesRouter.get('/', asyncHandler(async (req, res) => {
   const maxRent = req.query.maxRent ? Number(req.query.maxRent) : undefined;
   const bedrooms = req.query.bedrooms ? Number(req.query.bedrooms) : undefined;
   const where = {
-    status: PropertyStatus.PUBLISHED,
-    available: true,
+    status: PropertyStatus.PUBLISHED, available: true,
     ...(typeof req.query.district === 'string' ? { district: { equals: req.query.district, mode: 'insensitive' as const } } : {}),
     ...(typeof req.query.sector === 'string' ? { sector: { equals: req.query.sector, mode: 'insensitive' as const } } : {}),
     ...(typeof req.query.type === 'string' ? { propertyType: req.query.type } : {}),
@@ -46,7 +45,7 @@ propertiesRouter.get('/', asyncHandler(async (req, res) => {
 }));
 
 propertiesRouter.get('/:id', asyncHandler(async (req, res) => {
-  const property = await prisma.property.findFirst({ where: { id: req.params.id, status: PropertyStatus.PUBLISHED }, include: { images: { orderBy: { sortOrder: 'asc' } }, owner: { select: { id: true, fullName: true, role: true, phone: true } } } });
+  const property = await prisma.property.findFirst({ where: { id: req.params.id, status: PropertyStatus.PUBLISHED, available: true }, include: { images: { orderBy: { sortOrder: 'asc' } }, owner: { select: { id: true, fullName: true, role: true } } } });
   if (!property) { res.status(404).json({ message: 'Property not found.' }); return; }
   res.json({ data: property });
 }));

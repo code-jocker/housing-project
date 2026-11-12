@@ -5,6 +5,8 @@ import rateLimit from 'express-rate-limit';
 import { env } from './config/env.js';
 import { authRouter } from './modules/auth/auth.routes.js';
 import { propertiesRouter } from './modules/properties/properties.routes.js';
+import { marketplaceRouter } from './modules/marketplace/marketplace.routes.js';
+import { adminRouter } from './modules/admin/admin.routes.js';
 import { healthRouter } from './modules/health/health.routes.js';
 
 export const app = express();
@@ -17,6 +19,8 @@ app.get('/', (_req, res) => res.json({ name: 'HousingConnect API', version: '1.0
 app.use('/api/v1/health', healthRouter);
 app.use('/api/v1/auth', authRouter);
 app.use('/api/v1/properties', propertiesRouter);
+app.use('/api/v1/marketplace', marketplaceRouter);
+app.use('/api/v1/admin', adminRouter);
 app.use((_req, res) => res.status(404).json({ message: 'Route not found.' }));
 app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   console.error(error);

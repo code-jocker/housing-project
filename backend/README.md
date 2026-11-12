@@ -1,41 +1,27 @@
-# HousingConnect API
+# HousingConnect Rwanda API
 
-Node.js + Express + TypeScript API using PostgreSQL and Prisma.
+Node.js, Express, TypeScript, Prisma and PostgreSQL API.
 
-## Setup
-
+## Local setup
 1. Install Node.js 20.19.4 or newer and PostgreSQL.
-2. Create a database named `housingconnect`.
-3. Copy `.env.example` to `.env` and set `DATABASE_URL` and a random `JWT_SECRET` (minimum 32 characters).
-4. Run:
+2. Copy `.env.example` to `.env` and configure `DATABASE_URL` and a random `JWT_SECRET` of at least 32 characters.
+3. Run `npm install`.
+4. Run `npx prisma generate`.
+5. Run `npx prisma migrate dev --name init`.
+6. Run `npm run dev`. The API listens on port 8000 by default.
+7. Run `npm run build` before deployment.
 
-```bash
-npm install
-npx prisma generate
-npx prisma migrate dev --name init
-npm run dev
-```
+## Routes
+- `GET /api/v1/health`
+- `POST /api/v1/auth/register`, `POST /api/v1/auth/login`, `GET /api/v1/auth/me`
+- `GET /api/v1/properties`, `GET /api/v1/properties/:id`, `POST /api/v1/properties`, `PATCH /api/v1/properties/:id`
+- Authenticated marketplace: `GET /api/v1/marketplace/my-properties`, `GET /api/v1/marketplace/favorites`, `POST|DELETE /api/v1/marketplace/favorites/:propertyId`, `POST|GET /api/v1/marketplace/viewings`, `PATCH /api/v1/marketplace/viewings/:id`, `POST /api/v1/marketplace/properties/:propertyId/reports`
+- Admin only: `GET /api/v1/admin/overview`, `GET /api/v1/admin/properties/pending`, `PATCH /api/v1/admin/properties/:id/review`, `GET /api/v1/admin/reports`, `PATCH /api/v1/admin/reports/:id`, `GET /api/v1/admin/users`, `PATCH /api/v1/admin/users/:id/status`
 
-API defaults to `http://localhost:8000`.
+All protected routes require `Authorization: Bearer <token>`.
 
-## Endpoints
+## Important launch limitations
+Phone verification/OTP, identity and property-authority document review, Cloudinary upload signing, push notifications, payment collection, Google Maps, automated test coverage, production hosting and a privacy/terms/legal review are not yet configured. Registration currently issues a session before phone verification; this must be changed before public production launch. Admin publishing is a workflow decision only and is not proof of property ownership. A listing's review badge must not be presented as a guarantee against fraud.
 
-- `GET /api/v1/health` — API and database health.
-- `POST /api/v1/auth/register` — create TENANT, LANDLORD or AGENT account.
-- `POST /api/v1/auth/login` — phone/password login.
-- `GET /api/v1/auth/me` — current authenticated user.
-- `GET /api/v1/properties` — published listings; supports `district`, `sector`, `type`, `minRent`, `maxRent`, `bedrooms`, `page`, `limit`.
-- `GET /api/v1/properties/:id` — published property detail.
-- `POST /api/v1/properties` — submit listing for review (LANDLORD, AGENT, ADMIN).
-- `PATCH /api/v1/properties/:id` — update own listing (or any listing as ADMIN); updates return to review.
-
-Send authenticated requests with `Authorization: Bearer <token>`.
-
-## Security and production notes
-
-- Passwords are hashed with bcrypt; tokens are signed with a secret from the environment.
-- Public listing queries only expose PUBLISHED properties.
-- New/edited listings are PENDING_REVIEW by default. A verification/admin moderation workflow still needs to be implemented before accepting real listings.
-- Phone OTP delivery and phone-verified enforcement are NOT implemented yet. Registration currently creates an unverified account; integrate a legitimate SMS provider and require verification before production.
-- Cloudinary upload signing, appointment endpoints, favorites endpoints, admin moderation endpoints, automated tests, and deployment configuration are next milestones.
-- Never commit `.env` or production credentials.
+## Security
+Never commit `.env`, credentials, private keys, OTPs or identity documents. Use HTTPS, managed secrets, database backups, monitoring and a restricted CORS origin in production.
