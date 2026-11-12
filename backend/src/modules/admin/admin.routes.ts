@@ -83,5 +83,5 @@ adminRouter.patch('/users/:id/role', asyncHandler(async (req, res) => {
   if (!parsed.success) { res.status(400).json({ message: 'Choose TENANT, LANDLORD or AGENT.' }); return; }
   const result = await prisma.user.updateMany({ where: { id: req.params.id, role: { not: UserRole.ADMIN } }, data: { role: parsed.data.role } });
   if (!result.count) { res.status(404).json({ message: 'Non-admin account not found.' }); return; }
-  res.json({ message: 'User role updated. The account must sign in again to receive updated permissions.' });
+  res.json({ message: 'User role updated. Updated permissions are checked from the database on each authenticated request.' });
 }));

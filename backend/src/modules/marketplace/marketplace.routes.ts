@@ -17,7 +17,7 @@ marketplaceRouter.get('/my-properties', allowRoles(UserRole.LANDLORD, UserRole.A
 marketplaceRouter.get('/favorites', allowRoles(UserRole.TENANT, UserRole.LANDLORD, UserRole.AGENT), asyncHandler(async (req, res) => {
   const data = await prisma.favorite.findMany({
     where: { userId: req.auth!.userId, property: { status: PropertyStatus.PUBLISHED, available: true } },
-    include: { property: { include: { images: { orderBy: { sortOrder: 'asc' } } } },
+    include: { property: { include: { images: { orderBy: { sortOrder: 'asc' } } } } },
     orderBy: { createdAt: 'desc' },
   });
   res.json({ data: data.map(item => item.property) });
