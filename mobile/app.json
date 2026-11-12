@@ -1,0 +1,25 @@
+{
+  "expo": {
+    "name": "HousingConnect Rwanda",
+    "slug": "housingconnect-rwanda",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "backgroundColor": "#F5F7FB"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "rw.housingconnect.app"
+    },
+    "android": {
+      "package": "rw.housingconnect.app",
+      "adaptiveIcon": {
+        "backgroundColor": "#FFFFFF"
+      }
+    },
+    "plugins": [
+      "expo-status-bar"
+    ]
+  }
+}
