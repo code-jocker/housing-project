@@ -3,7 +3,8 @@ import { SafeAreaView, View, Text, TextInput, ScrollView, Image, Pressable, Styl
 import { StatusBar as ExpoStatusBar } from 'expo-status-bar';
 import { properties, Property } from './src/data/properties';
 import { colors } from './src/theme';
-import { getProperties } from './src/services/api';
+import { addFavorite, AuthUser, getFavorites, getProperties, getSession, logout, removeFavorite } from './src/services/api';
+import { AuthScreen } from './src/components/AuthScreen';
 
 const money = (value: number) => `RWF ${value.toLocaleString('en-US')}`;
 
@@ -33,6 +34,9 @@ export default function App() {
   const [listingData, setListingData] = useState<Property[]>(properties);
   const [loadingListings, setLoadingListings] = useState(true);
   const [apiMessage, setApiMessage] = useState('');
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const [authVisible, setAuthVisible] = useState(false);
+  useEffect(() => { getSession().then(async session => { setUser(session); if (session) { try { const items = await getFavorites(); setSaved(items.map(item => item.id)); } catch { /* Saved-list loading can be retried later. */ } } }); }, []);
   useEffect(() => {
     let active = true;
     getProperties().then(items => {
@@ -49,7 +53,15 @@ export default function App() {
     const matchesFilter = filter === 'All' || (filter === 'Verified' ? p.verified : p.type === filter);
     return matchesQuery && matchesFilter && p.available;
   }), [query, filter]);
-  const toggleSave = (id: string) => setSaved(current => current.includes(id) ? current.filter(x => x !== id) : [...current, id]);
+  const toggleSave = async (id: string) => {
+    if (!user) { setAuthVisible(true); return; }
+    const alreadySaved = saved.includes(id);
+    setSaved(current => alreadySaved ? current.filter(x => x !== id) : [...current, id]);
+    try { if (alreadySaved) await removeFavorite(id); else await addFavorite(id); }
+    catch (error) { setSaved(current => alreadySaved ? [...current, id] : current.filter(x => x !== id)); setApiMessage(error instanceof Error ? error.message : 'Could not update saved properties.'); }
+  };
+  const onAuthenticated = async (account: AuthUser) => { setUser(account); setAuthVisible(false); try { const items = await getFavorites(); setSaved(items.map(item => item.id)); } catch { setSaved([]); } };
+  const onLogout = async () => { await logout(); setUser(null); setSaved([]); setAuthVisible(false); };
 
   if (selected) return (
     <SafeAreaView style={styles.safe}><ExpoStatusBar style="dark" /><ScrollView>
@@ -66,7 +78,7 @@ export default function App() {
 
   return (
     <SafeAreaView style={styles.safe}><ExpoStatusBar style="dark" /><ScrollView showsVerticalScrollIndicator={false}>
-      <View style={styles.header}><View><Text style={styles.brand}>HousingConnect</Text><Text style={styles.country}>RWANDA · FIND A PLACE TO CALL HOME</Text></View><View style={styles.avatar}><Text style={styles.avatarText}>HC</Text></View></View>
+      <View style={styles.header}><View><Text style={styles.brand}>HousingConnect</Text><Text style={styles.country}>RWANDA · FIND A PLACE TO CALL HOME</Text></View><Pressable style={styles.avatar} onPress={() => user ? onLogout() : setAuthVisible(true)}><Text style={styles.avatarText}>{user ? '↪' : 'HC'}</Text></Pressable></View>
       <View style={styles.hero}><Text style={styles.eyebrow}>YOUR NEXT HOME STARTS HERE</Text><Text style={styles.heroTitle}>Find a home that fits your life.</Text><Text style={styles.heroSub}>Explore rental homes across Rwanda with clearer prices and safer listings.</Text>
         <View style={styles.searchBox}><Text style={styles.searchIcon}>⌕</Text><TextInput value={query} onChangeText={setQuery} placeholder="Search district, sector or property" placeholderTextColor="#8292A6" style={styles.searchInput} /></View>
       </View>
@@ -77,7 +89,8 @@ export default function App() {
         {filtered.map(item => <PropertyCard key={item.id} item={item} saved={saved.includes(item.id)} onSave={() => toggleSave(item.id)} onOpen={() => setSelected(item)} />)}
         {filtered.length === 0 && <View style={styles.empty}><Text style={styles.emptyTitle}>No properties found</Text><Text style={styles.description}>Try another district, sector or property type.</Text></View>}
       </View>
-    </ScrollView><View style={styles.tabBar}><Text style={styles.tabActive}>⌂  Explore</Text><Text style={styles.tab}>♡  Saved ({saved.length})</Text><Text style={styles.tab}>＋  List a home</Text><Text style={styles.tab}>☻  Profile</Text></View></SafeAreaView>
+    </ScrollView><View style={styles.tabBar}><Text style={styles.tabActive}>⌂  Explore</Text><Text style={styles.tab}>♡  Saved ({saved.length})</Text><Text style={styles.tab}>＋  List a home</Text><Pressable onPress={() => user ? onLogout() : setAuthVisible(true)}><Text style={styles.tab}>{user ? '↪ Sign out' : '☻ Profile'}</Text></Pressable></View></SafeAreaView>
+    {authVisible && <AuthScreen onAuthenticated={onAuthenticated} onClose={() => setAuthVisible(false)} />}
   );
 }
 
