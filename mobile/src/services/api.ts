@@ -5,7 +5,7 @@ const TOKEN_KEY = 'housingconnect_access_token';
 export type ApiProperty = {
   id: string; title: string; description: string; propertyType: string;
   district: string; sector: string; monthlyRentRwf: number; bedrooms: number;
-  bathrooms: number; furnished: boolean; available: boolean; verifiedAt: string | null;
+  bathrooms: number; furnished: boolean; available: boolean; verifiedAt: string | null; status?: string; depositRwf?: number;
   images: { id: string; url: string; sortOrder: number }[];
 };
 type PropertyListResponse = { data: ApiProperty[]; pagination: { page: number; limit: number; total: number; pages: number } };
