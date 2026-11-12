@@ -1,0 +1,132 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  TENANT
+  LANDLORD
+  AGENT
+  ADMIN
+}
+
+enum PropertyStatus {
+  DRAFT
+  PENDING_REVIEW
+  PUBLISHED
+  REJECTED
+  RENTED
+  ARCHIVED
+}
+
+enum ViewingStatus {
+  REQUESTED
+  ACCEPTED
+  DECLINED
+  COMPLETED
+  CANCELLED
+}
+
+model User {
+  id           String           @id @default(cuid())
+  fullName     String
+  phone        String           @unique
+  email        String?          @unique
+  passwordHash String
+  role         UserRole         @default(TENANT)
+  isActive     Boolean          @default(true)
+  phoneVerifiedAt DateTime?
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  properties   Property[]
+  favorites    Favorite[]
+  viewingRequests ViewingRequest[]
+  reports      PropertyReport[]
+  @@index([role])
+}
+
+model Property {
+  id              String         @id @default(cuid())
+  ownerId         String
+  owner           User           @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  title           String
+  description     String
+  propertyType    String
+  district        String
+  sector          String
+  cell            String?
+  address         String?
+  monthlyRentRwf  Int
+  depositRwf      Int            @default(0)
+  bedrooms        Int
+  bathrooms       Int
+  furnished       Boolean        @default(false)
+  parking         Boolean        @default(false)
+  waterAvailable  Boolean        @default(true)
+  electricity     Boolean        @default(true)
+  internet        Boolean        @default(false)
+  status          PropertyStatus @default(PENDING_REVIEW)
+  verifiedAt      DateTime?
+  available       Boolean        @default(true)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  images          PropertyImage[]
+  favorites       Favorite[]
+  viewingRequests ViewingRequest[]
+  reports         PropertyReport[]
+  @@index([district, sector])
+  @@index([monthlyRentRwf])
+  @@index([status, available])
+}
+
+model PropertyImage {
+  id         String   @id @default(cuid())
+  propertyId String
+  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  url        String
+  publicId   String?
+  sortOrder  Int      @default(0)
+  createdAt  DateTime @default(now())
+}
+
+model Favorite {
+  id         String   @id @default(cuid())
+  userId     String
+  propertyId String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+  @@unique([userId, propertyId])
+}
+
+model ViewingRequest {
+  id         String        @id @default(cuid())
+  tenantId   String
+  propertyId String
+  tenant     User          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  property   Property      @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  preferredAt DateTime
+  message    String?
+  status     ViewingStatus @default(REQUESTED)
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+  @@index([tenantId, status])
+  @@index([propertyId, status])
+}
+
+model PropertyReport {
+  id         String   @id @default(cuid())
+  reporterId String
+  propertyId String
+  reporter   User     @relation(fields: [reporterId], references: [id], onDelete: Cascade)
+  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  reason     String
+  details    String?
+  resolved   Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  @@index([resolved, createdAt])
+}
