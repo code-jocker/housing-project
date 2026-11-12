@@ -116,7 +116,7 @@ export async function reportProperty(propertyId: string, reason: 'SUSPECTED_SCAM
 
 export type AppNotification = { id: string; type: string; title: string; body: string; readAt: string | null; createdAt: string };
 export async function getNotifications(): Promise<{ data: AppNotification[]; unread: number }> {
-  return request('/api/v1/notifications?limit=40');
+  return request<{ data: AppNotification[]; unread: number }>('/api/v1/notifications?limit=40');
 }
 export async function markNotificationRead(id: string) {
   return request('/api/v1/notifications/' + encodeURIComponent(id) + '/read', { method: 'PATCH' });
