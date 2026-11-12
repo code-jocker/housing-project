@@ -1,9 +1,11 @@
 import { after, before, test } from 'node:test';
+import { createHmac } from 'node:crypto';
 import assert from 'node:assert/strict';
 import bcrypt from 'bcryptjs';
 import request from 'supertest';
 import { app } from '../src/app.js';
 import { prisma } from '../src/config/prisma.js';
+import { env } from '../src/config/env.js';
 
 const suffix = Date.now().toString().slice(-8);
 const tenantPhone = `+2507${suffix}1`;
@@ -124,7 +126,18 @@ test('tenant, landlord and admin marketplace journey', async () => {
   assert.ok(audit.body.data.some((item: { action: string }) => item.action === 'PROPERTY_REVIEWED'));
   assert.ok(audit.body.data.some((item: { action: string }) => item.action === 'VIEWING_STATUS_CHANGED'));
   assert.ok(audit.body.data.some((item: { action: string }) => item.action === 'PROPERTY_REPORTED'));
-  await prisma.user.update({ where: { phone: tenantPhone }, data: { tokenVersion: { increment: 1 } } });
+  const resetCode = '135790';
+  const resetHash = createHmac('sha256', env.JWT_SECRET).update(`${tenantPhone}:PASSWORD_RESET:${resetCode}`).digest('hex');
+  await prisma.phoneOtp.upsert({ where: { phone: tenantPhone }, create: { phone: tenantPhone, codeHash: resetHash, purpose: 'PASSWORD_RESET', expiresAt: new Date(Date.now() + 10 * 60_000), attempts: 0 }, update: { codeHash: resetHash, purpose: 'PASSWORD_RESET', expiresAt: new Date(Date.now() + 10 * 60_000), attempts: 0 } });
+  const reset = await request(app).post('/api/v1/auth/password-reset/confirm').send({ phone: tenantPhone, code: resetCode, newPassword: 'NewHousing!2026' });
+  assert.equal(reset.status, 200);
+  const oldLogin = await request(app).post('/api/v1/auth/login').send({ phone: tenantPhone, password });
+  assert.equal(oldLogin.status, 401);
+  const newLogin = await request(app).post('/api/v1/auth/login').send({ phone: tenantPhone, password: 'NewHousing!2026' });
+  assert.equal(newLogin.status, 200);
   const revokedSession = await request(app).get('/api/v1/auth/me').set('Authorization', `Bearer ${tenantToken}`);
   assert.equal(revokedSession.status, 401);
+  await prisma.user.update({ where: { phone: tenantPhone }, data: { tokenVersion: { increment: 1 } } });
+  const newestSession = await request(app).get('/api/v1/auth/me').set('Authorization', `Bearer ${newLogin.body.token}`);
+  assert.equal(newestSession.status, 401);
 });
