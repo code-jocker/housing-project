@@ -3,12 +3,13 @@ import { SafeAreaView, View, Text, TextInput, ScrollView, Image, Pressable, Styl
 import { StatusBar as ExpoStatusBar } from 'expo-status-bar';
 import { properties, Property } from './src/data/properties';
 import { colors } from './src/theme';
-import { addFavorite, AuthUser, getFavorites, getProperties, getSession, logout, removeFavorite } from './src/services/api';
+import { addFavorite, AuthUser, getFavorites, getProperties, getSession, logout, removeFavorite, reportProperty } from './src/services/api';
 import { AuthScreen } from './src/components/AuthScreen';
 import { ViewingRequestForm } from './src/components/ViewingRequestForm';
 import { CreateListingForm } from './src/components/CreateListingForm';
 import { AdminDashboard } from './src/components/AdminDashboard';
 import { LandlordDashboard } from './src/components/LandlordDashboard';
+import { TenantDashboard } from './src/components/TenantDashboard';
 
 const money = (value: number) => `RWF ${value.toLocaleString('en-US')}`;
 
@@ -46,6 +47,7 @@ export default function App() {
   const [listingVisible, setListingVisible] = useState(false);
   const [adminVisible, setAdminVisible] = useState(false);
   const [landlordVisible, setLandlordVisible] = useState(false);
+  const [tenantVisible, setTenantVisible] = useState(false);
   useEffect(() => { getSession().then(async session => { setUser(session); if (session) { try { const items = await getFavorites(); setSaved(items.map(item => item.id)); } catch { /* Saved-list loading can be retried later. */ } } }); }, []);
   useEffect(() => {
     let active = true;
@@ -84,6 +86,16 @@ export default function App() {
         <Text style={styles.sectionTitle}>About this property</Text><Text style={styles.description}>{selected.description}</Text>
         <Text style={styles.sectionTitle}>Listing status</Text><Text style={styles.description}>{selected.verified ? 'Identity/listing review badge shown in this demo. Confirm ownership or authority to rent separately.' : 'This listing has not yet been verified. Exercise caution before paying any money.'}</Text>
         <Pressable style={styles.primaryButton} onPress={() => { if (!user) { setSelected(null); setAuthVisible(true); } else if (user.role !== 'TENANT') { Alert.alert('Tenant account required', 'Sign in with a tenant account to request a viewing.'); } else { setViewingVisible(true); } }}><Text style={styles.primaryButtonText}>Request a viewing</Text></Pressable>
+        <Pressable style={[styles.primaryButton,{backgroundColor:colors.danger}]} onPress={() => {
+          if (!user) { setSelected(null); setAuthVisible(true); return; }
+          Alert.alert('Report this listing','Choose why this property should be reviewed.',[
+            {text:'Cancel',style:'cancel'},
+            {text:'Suspected scam',onPress:()=>{void reportProperty(selected.id,'SUSPECTED_SCAM').then(()=>Alert.alert('Report submitted','Our moderation team will review this listing.')).catch(e=>Alert.alert('Could not report listing',e instanceof Error?e.message:'Try again.'));}},
+            {text:'False information',onPress:()=>{void reportProperty(selected.id,'FALSE_INFORMATION').then(()=>Alert.alert('Report submitted','Our moderation team will review this listing.')).catch(e=>Alert.alert('Could not report listing',e instanceof Error?e.message:'Try again.'));}},
+            {text:'Duplicate listing',onPress:()=>{void reportProperty(selected.id,'DUPLICATE_LISTING').then(()=>Alert.alert('Report submitted','Our moderation team will review this listing.')).catch(e=>Alert.alert('Could not report listing',e instanceof Error?e.message:'Try again.'));}},
+            {text:'Unauthorized agent',onPress:()=>{void reportProperty(selected.id,'UNAUTHORIZED_AGENT').then(()=>Alert.alert('Report submitted','Our moderation team will review this listing.')).catch(e=>Alert.alert('Could not report listing',e instanceof Error?e.message:'Try again.'));}}
+          ]);
+        }}><Text style={styles.primaryButtonText}>Report this listing</Text></Pressable>
       </View>
     </ScrollView></SafeAreaView>
     {viewingVisible && <ViewingRequestForm propertyId={selected.id} onClose={() => setViewingVisible(false)} onSubmitted={() => { setViewingVisible(false); Alert.alert('Request sent', 'Your viewing request has been sent to the listing owner.'); }} />}
@@ -94,7 +106,7 @@ export default function App() {
   return (
     <>
     <SafeAreaView style={styles.safe}><ExpoStatusBar style="dark" /><ScrollView showsVerticalScrollIndicator={false}>
-      <View style={styles.header}><View><Text style={styles.brand}>HousingConnect</Text><Text style={styles.country}>RWANDA · FIND A PLACE TO CALL HOME</Text></View><Pressable style={styles.avatar} onPress={() => user?.role === 'ADMIN' ? setAdminVisible(true) : user?.role === 'LANDLORD' || user?.role === 'AGENT' ? setLandlordVisible(true) : user ? onLogout() : setAuthVisible(true)}><Text style={styles.avatarText}>{user?.role === 'ADMIN' ? 'AD' : user?.role === 'LANDLORD' || user?.role === 'AGENT' ? 'LH' : user ? '↪' : 'HC'}</Text></Pressable></View>
+      <View style={styles.header}><View><Text style={styles.brand}>HousingConnect</Text><Text style={styles.country}>RWANDA · FIND A PLACE TO CALL HOME</Text></View><Pressable style={styles.avatar} onPress={() => user?.role === 'ADMIN' ? setAdminVisible(true) : user?.role === 'LANDLORD' || user?.role === 'AGENT' ? setLandlordVisible(true) : user?.role === 'TENANT' ? setTenantVisible(true) : user ? onLogout() : setAuthVisible(true)}><Text style={styles.avatarText}>{user?.role === 'ADMIN' ? 'AD' : user?.role === 'LANDLORD' || user?.role === 'AGENT' ? 'LH' : user ? '↪' : 'HC'}</Text></Pressable></View>
       <View style={styles.hero}><Text style={styles.eyebrow}>YOUR NEXT HOME STARTS HERE</Text><Text style={styles.heroTitle}>Find a home that fits your life.</Text><Text style={styles.heroSub}>Explore rental homes across Rwanda with clearer prices and safer listings.</Text>
         <View style={styles.searchBox}><Text style={styles.searchIcon}>⌕</Text><TextInput value={query} onChangeText={setQuery} placeholder="Search district, sector or property" placeholderTextColor="#8292A6" style={styles.searchInput} /></View>
       </View>
@@ -105,10 +117,11 @@ export default function App() {
         {filtered.map(item => <PropertyCard key={item.id} item={item} saved={saved.includes(item.id)} onSave={() => toggleSave(item.id)} onOpen={() => setSelected(item)} />)}
         {filtered.length === 0 && <View style={styles.empty}><Text style={styles.emptyTitle}>No properties found</Text><Text style={styles.description}>Try another district, sector or property type.</Text></View>}
       </View>
-    </ScrollView><View style={styles.tabBar}><Pressable onPress={() => setShowSaved(false)}><Text style={!showSaved ? styles.tabActive : styles.tab}>⌂  Explore</Text></Pressable><Pressable onPress={() => { if (!user) setAuthVisible(true); else setShowSaved(true); }}><Text style={showSaved ? styles.tabActive : styles.tab}>♡  Saved ({saved.length})</Text></Pressable><Pressable onPress={() => { if (!user) setAuthVisible(true); else if (user.role === 'LANDLORD' || user.role === 'AGENT') setListingVisible(true); else Alert.alert('Landlord account required', 'Use a landlord or agent account to publish a property.'); }}><Text style={styles.tab}>＋  List a home</Text></Pressable><Pressable onPress={() => user?.role === 'ADMIN' ? setAdminVisible(true) : user?.role === 'LANDLORD' || user?.role === 'AGENT' ? setLandlordVisible(true) : user ? onLogout() : setAuthVisible(true)}><Text style={styles.tab}>{user?.role === 'ADMIN' ? 'Admin' : user?.role === 'LANDLORD' || user?.role === 'AGENT' ? 'My listings' : user ? '↪ Sign out' : '☻ Profile'}</Text></Pressable></View></SafeAreaView>
+    </ScrollView><View style={styles.tabBar}><Pressable onPress={() => setShowSaved(false)}><Text style={!showSaved ? styles.tabActive : styles.tab}>⌂  Explore</Text></Pressable><Pressable onPress={() => { if (!user) setAuthVisible(true); else setShowSaved(true); }}><Text style={showSaved ? styles.tabActive : styles.tab}>♡  Saved ({saved.length})</Text></Pressable><Pressable onPress={() => { if (!user) setAuthVisible(true); else if (user.role === 'LANDLORD' || user.role === 'AGENT') setListingVisible(true); else Alert.alert('Landlord account required', 'Use a landlord or agent account to publish a property.'); }}><Text style={styles.tab}>＋  List a home</Text></Pressable><Pressable onPress={() => user?.role === 'ADMIN' ? setAdminVisible(true) : user?.role === 'LANDLORD' || user?.role === 'AGENT' ? setLandlordVisible(true) : user ? onLogout() : setAuthVisible(true)}><Text style={styles.tab}>{user?.role === 'ADMIN' ? 'Admin' : user?.role === 'LANDLORD' || user?.role === 'AGENT' ? 'My listings' : user?.role === 'TENANT' ? 'My requests' : user ? '↪ Sign out' : '☻ Profile'}</Text></Pressable></View></SafeAreaView>
     {authVisible && <AuthScreen onAuthenticated={onAuthenticated} onClose={() => setAuthVisible(false)} />}
     {adminVisible && <AdminDashboard onClose={() => setAdminVisible(false)} />}
     {landlordVisible && <LandlordDashboard onClose={() => setLandlordVisible(false)} />}
+    {tenantVisible && <TenantDashboard onClose={() => setTenantVisible(false)} />}
     {listingVisible && <CreateListingForm onClose={() => setListingVisible(false)} onCreated={async () => { setListingVisible(false); Alert.alert('Listing submitted', 'Your property is pending platform review.'); try { const items = await getProperties(); if (items.length) setListingData(items.map(item => ({ id: item.id, title: item.title, district: item.district, sector: item.sector, rent: item.monthlyRentRwf, bedrooms: item.bedrooms, bathrooms: item.bathrooms, type: item.propertyType as Property['type'], image: item.images[0]?.url || properties[0].image, verified: Boolean(item.verifiedAt), available: item.available, furnished: item.furnished, description: item.description }))); } catch { /* Refresh can be retried when the feed reloads. */ } }} />}
     </>
   );

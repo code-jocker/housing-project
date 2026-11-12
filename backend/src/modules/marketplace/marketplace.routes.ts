@@ -72,7 +72,10 @@ marketplaceRouter.get('/viewings', asyncHandler(async (req, res) => {
     },
     orderBy: { createdAt: 'desc' },
   });
-  res.json({ data });
+  const safeData = data.map(item => req.auth!.role === UserRole.TENANT && item.status !== ViewingStatus.ACCEPTED
+    ? { ...item, property: { ...item.property, owner: { ...item.property.owner, phone: '' } } }
+    : item);
+  res.json({ data: safeData });
 }));
 
 const viewingUpdateSchema = z.object({ status: z.enum(['ACCEPTED', 'DECLINED', 'COMPLETED', 'CANCELLED']) });

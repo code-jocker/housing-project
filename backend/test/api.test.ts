@@ -99,6 +99,9 @@ test('tenant, landlord and admin marketplace journey', async () => {
   const accepted = await request(app).patch(`/api/v1/marketplace/viewings/${viewingId}`).set('Authorization', `Bearer ${landlordToken}`).send({ status: 'ACCEPTED' });
   assert.equal(accepted.status, 200);
   assert.equal(accepted.body.data.status, 'ACCEPTED');
+  const tenantViewings = await request(app).get('/api/v1/marketplace/viewings').set('Authorization', `Bearer ${tenantToken}`);
+  assert.equal(tenantViewings.status, 200);
+  assert.equal(tenantViewings.body.data[0].property.owner.phone, landlordPhone);
 
   const report = await request(app).post(`/api/v1/marketplace/properties/${propertyId}/reports`).set('Authorization', `Bearer ${tenantToken}`).send({ reason: 'FALSE_INFORMATION', details: 'Integration test report.' });
   assert.equal(report.status, 201);
