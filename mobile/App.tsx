@@ -77,6 +77,7 @@ export default function App() {
   );
 
   return (
+    <>
     <SafeAreaView style={styles.safe}><ExpoStatusBar style="dark" /><ScrollView showsVerticalScrollIndicator={false}>
       <View style={styles.header}><View><Text style={styles.brand}>HousingConnect</Text><Text style={styles.country}>RWANDA · FIND A PLACE TO CALL HOME</Text></View><Pressable style={styles.avatar} onPress={() => user ? onLogout() : setAuthVisible(true)}><Text style={styles.avatarText}>{user ? '↪' : 'HC'}</Text></Pressable></View>
       <View style={styles.hero}><Text style={styles.eyebrow}>YOUR NEXT HOME STARTS HERE</Text><Text style={styles.heroTitle}>Find a home that fits your life.</Text><Text style={styles.heroSub}>Explore rental homes across Rwanda with clearer prices and safer listings.</Text>
@@ -91,6 +92,7 @@ export default function App() {
       </View>
     </ScrollView><View style={styles.tabBar}><Text style={styles.tabActive}>⌂  Explore</Text><Text style={styles.tab}>♡  Saved ({saved.length})</Text><Text style={styles.tab}>＋  List a home</Text><Pressable onPress={() => user ? onLogout() : setAuthVisible(true)}><Text style={styles.tab}>{user ? '↪ Sign out' : '☻ Profile'}</Text></Pressable></View></SafeAreaView>
     {authVisible && <AuthScreen onAuthenticated={onAuthenticated} onClose={() => setAuthVisible(false)} />}
+    </>
   );
 }
 

@@ -86,8 +86,8 @@ marketplaceRouter.patch('/viewings/:id', asyncHandler(async (req, res) => {
   const isAdmin = req.auth!.role === UserRole.ADMIN;
   if (!isTenant && !isOwner && !isAdmin) { res.status(403).json({ message: 'You cannot update this viewing request.' }); return; }
   const next = parsed.data.status as ViewingStatus;
-  const ownerTransitions = [ViewingStatus.ACCEPTED, ViewingStatus.DECLINED, ViewingStatus.COMPLETED];
-  const tenantTransitions = [ViewingStatus.CANCELLED];
+  const ownerTransitions: ViewingStatus[] = [ViewingStatus.ACCEPTED, ViewingStatus.DECLINED, ViewingStatus.COMPLETED];
+  const tenantTransitions: ViewingStatus[] = [ViewingStatus.CANCELLED];
   if (!isAdmin && ((isOwner && !ownerTransitions.includes(next)) || (isTenant && !tenantTransitions.includes(next)))) {
     res.status(403).json({ message: 'Only the listing owner can accept, decline or complete a request. Tenants can cancel their own request.' }); return;
   }
