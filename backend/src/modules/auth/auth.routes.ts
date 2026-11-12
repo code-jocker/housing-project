@@ -7,11 +7,12 @@ import { prisma } from '../../config/prisma.js';
 import { env } from '../../config/env.js';
 import { authenticate } from '../../middleware/auth.js';
 import { asyncHandler } from '../../utils/async-handler.js';
+import { createAndSendPhoneOtp, verifyPhoneOtpHash } from './otp.service.js';
 
 export const authRouter = Router();
 const registerSchema = z.object({
   fullName: z.string().trim().min(2).max(100),
-  phone: z.string().trim().regex(/^\+?[0-9]{9,15}$/, 'Enter a valid phone number with country code.'),
+  phone: z.string().trim().regex(/^\+[1-9][0-9]{8,14}$/, 'Enter a valid phone number with country code.'),
   email: z.email().optional(),
   password: z.string().min(8).max(72),
   role: z.enum(['TENANT', 'LANDLORD']).default('TENANT'),
@@ -33,7 +34,16 @@ authRouter.post('/register', asyncHandler(async (req, res) => {
   if (existing) { res.status(409).json({ message: 'A user with that phone number or email already exists.' }); return; }
   const passwordHash = await bcrypt.hash(password, 12);
   const user = await prisma.user.create({ data: { fullName, phone, email, passwordHash, role } });
-  if (env.NODE_ENV === 'production' && !user.phoneVerifiedAt) { res.status(201).json({ message: 'Account created. Phone verification is required before sign-in.', verificationRequired: true }); return; }
+  if ((env.NODE_ENV === 'production' || env.OTP_DEBUG) && !user.phoneVerifiedAt) {
+    try {
+      const otp = await createAndSendPhoneOtp(phone);
+      res.status(201).json({ message: 'Account created. Enter the verification code sent to your phone.', verificationRequired: true, ...('debugCode' in otp ? { debugCode: otp.debugCode } : {}) });
+      return;
+    } catch {
+      res.status(503).json({ message: 'Account created, but the verification SMS could not be sent. Retry the verification request shortly.' });
+      return;
+    }
+  }
   res.status(201).json({ message: 'Account created.', token: issueToken(user), user: publicUser(user) });
 }));
 
@@ -44,8 +54,45 @@ authRouter.post('/login', asyncHandler(async (req, res) => {
   if (!user || !user.isActive || !(await bcrypt.compare(parsed.data.password, user.passwordHash))) {
     res.status(401).json({ message: 'Incorrect phone number or password.' }); return;
   }
-  if (env.NODE_ENV === 'production' && !user.phoneVerifiedAt) { res.status(403).json({ message: 'Verify your phone number before signing in.' }); return; }
+  if ((env.NODE_ENV === 'production' || env.OTP_DEBUG) && !user.phoneVerifiedAt) { res.status(403).json({ message: 'Verify your phone number before signing in.' }); return; }
   res.json({ token: issueToken(user), user: publicUser(user) });
+}));
+
+
+const otpRequestSchema = z.object({ phone: z.string().trim().regex(/^\+[1-9][0-9]{8,14}$/) });
+authRouter.post('/otp/request', asyncHandler(async (req, res) => {
+  const parsed = otpRequestSchema.safeParse(req.body);
+  if (!parsed.success) { res.status(400).json({ message: 'Enter a valid phone number with country code.' }); return; }
+  const user = await prisma.user.findUnique({ where: { phone: parsed.data.phone }, select: { id: true, phoneVerifiedAt: true } });
+  if (!user || user.phoneVerifiedAt) { res.status(202).json({ message: 'If the account needs verification, a code will be sent.' }); return; }
+  try {
+    const result = await createAndSendPhoneOtp(parsed.data.phone);
+    res.status(202).json({ message: result.sent ? 'Verification code sent if the phone can receive SMS.' : 'Please wait before requesting another code.', ...('waitSeconds' in result ? { waitSeconds: result.waitSeconds } : {}), ...('debugCode' in result ? { debugCode: result.debugCode } : {}) });
+  } catch {
+    res.status(503).json({ message: 'SMS delivery is temporarily unavailable. Try again later.' });
+  }
+}));
+
+const otpVerifySchema = z.object({ phone: z.string().trim().regex(/^\+[1-9][0-9]{8,14}$/), code: z.string().regex(/^[0-9]{6}$/) });
+authRouter.post('/otp/verify', asyncHandler(async (req, res) => {
+  const parsed = otpVerifySchema.safeParse(req.body);
+  if (!parsed.success) { res.status(400).json({ message: 'Enter your phone number and the 6-digit verification code.' }); return; }
+  const { phone, code } = parsed.data;
+  const challenge = await prisma.phoneOtp.findUnique({ where: { phone } });
+  if (!challenge || challenge.expiresAt <= new Date()) {
+    if (challenge) await prisma.phoneOtp.delete({ where: { phone } });
+    res.status(400).json({ message: 'The verification code is invalid or expired. Request a new code.' }); return;
+  }
+  if (challenge.attempts >= 5) { res.status(429).json({ message: 'Too many incorrect attempts. Request a new code.' }); return; }
+  if (!verifyPhoneOtpHash(phone, code, challenge.codeHash)) {
+    await prisma.phoneOtp.update({ where: { phone }, data: { attempts: { increment: 1 } } });
+    res.status(400).json({ message: 'Incorrect verification code.' }); return;
+  }
+  await prisma.$transaction([
+    prisma.user.update({ where: { phone }, data: { phoneVerifiedAt: new Date() } }),
+    prisma.phoneOtp.delete({ where: { phone } }),
+  ]);
+  res.json({ message: 'Phone number verified. You can now sign in.' });
 }));
 
 authRouter.get('/me', authenticate, asyncHandler(async (req, res) => {

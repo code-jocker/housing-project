@@ -8,6 +8,10 @@ const schema = z.object({
   JWT_SECRET: z.string().min(32, 'JWT_SECRET must contain at least 32 characters'),
   JWT_EXPIRES_IN: z.string().default('7d'),
   CLIENT_ORIGIN: z.string().default('*'),
+  AFRICASTALKING_USERNAME: z.string().optional(),
+  AFRICASTALKING_API_KEY: z.string().optional(),
+  AFRICASTALKING_SENDER_ID: z.string().optional(),
+  OTP_DEBUG: z.enum(['true', 'false']).default('false').transform(value => value === 'true'),
 });
 
 const parsed = schema.safeParse(process.env);

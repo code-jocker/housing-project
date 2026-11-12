@@ -13,7 +13,7 @@ Node.js, Express, TypeScript, Prisma and PostgreSQL API.
 
 ## Routes
 - `GET /api/v1/health`
-- `POST /api/v1/auth/register`, `POST /api/v1/auth/login`, `GET /api/v1/auth/me`
+- `POST /api/v1/auth/register`, `POST /api/v1/auth/login`, `POST /api/v1/auth/otp/request`, `POST /api/v1/auth/otp/verify`, `GET /api/v1/auth/me`
 - `GET /api/v1/properties`, `GET /api/v1/properties/:id`, `POST /api/v1/properties`, `PATCH /api/v1/properties/:id`
 - Authenticated marketplace: `GET /api/v1/marketplace/my-properties`, `GET /api/v1/marketplace/favorites`, `POST|DELETE /api/v1/marketplace/favorites/:propertyId`, `POST|GET /api/v1/marketplace/viewings`, `PATCH /api/v1/marketplace/viewings/:id`, `POST /api/v1/marketplace/properties/:propertyId/reports`
 - Admin only: `GET /api/v1/admin/overview`, `GET /api/v1/admin/properties/pending`, `PATCH /api/v1/admin/properties/:id/review`, `GET /api/v1/admin/reports`, `PATCH /api/v1/admin/reports/:id`, `GET /api/v1/admin/users`, `PATCH /api/v1/admin/users/:id/status`
@@ -25,3 +25,6 @@ Phone verification/OTP, identity and property-authority document review, Cloudin
 
 ## Security
 Never commit `.env`, credentials, private keys, OTPs or identity documents. Use HTTPS, managed secrets, database backups, monitoring and a restricted CORS origin in production.
+
+## Phone OTP configuration
+Set `AFRICASTALKING_USERNAME`, `AFRICASTALKING_API_KEY` and, if approved for your account, `AFRICASTALKING_SENDER_ID`. Apply the Prisma schema with `npx prisma migrate dev --name phone_otp`. In development only, `OTP_DEBUG=true` returns a debug code for local testing; set `OTP_DEBUG=false` in production. Production mode requires SMS credentials and does not issue a session until the phone is verified. OTPs expire after 10 minutes, are limited to five verification attempts and can be resent no more than once per minute per phone number.

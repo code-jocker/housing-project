@@ -130,3 +130,14 @@ model PropertyReport {
   createdAt  DateTime @default(now())
   @@index([resolved, createdAt])
 }
+
+model PhoneOtp {
+  id         String   @id @default(cuid())
+  phone      String   @unique
+  codeHash   String
+  expiresAt  DateTime
+  attempts   Int      @default(0)
+  lastSentAt DateTime @default(now())
+  createdAt  DateTime @default(now())
+  @@index([expiresAt])
+}
