@@ -1,24 +1,15 @@
 # HousingConnect Rwanda
 
-Mobile-first rental marketplace for Rwanda, connecting house seekers with verified landlords and authorized agents.
+Mobile-first rental marketplace for tenants, landlords and authorized agents in Rwanda.
 
-## Mobile stack
-- React Native + Expo + TypeScript
-- Android-first; iOS-compatible
-- Expo Router-ready project structure (initial screen scaffold)
+## Repository structure
+- `mobile/`: Expo + React Native + TypeScript Android/iOS application.
+- `backend/`: Express + TypeScript API with Prisma and PostgreSQL.
 
-## Planned capabilities
-- Search properties by district, sector, rent, bedrooms and property type
-- Property details, photo galleries, amenities and transparent costs
-- Favorites and viewing requests
-- Landlord/agent listing management
-- User and listing verification, moderation and scam reporting
+## Current development status
+The repository contains property discovery, API-backed listing data, account screens with secure local token storage, saved-property API, landlord property submission, viewing-request API, reporting API and administrator moderation endpoints.
 
-## Run
-```bash
-cd mobile
-npm install
-npx expo start
-```
+This is an active development build, **not yet approved for public production use**. Phone OTP delivery/verification, identity checks, proof of ownership or authority to rent, secure document upload, push notifications, maps, end-to-end tests, deployment hardening and legal/privacy review remain launch blockers. Review of a listing is not proof of ownership. Sample mobile listings are demo data and must not be mistaken for real inventory.
 
-The current scaffold uses sample listings. Authentication, API integration, persistent favorites, live maps, notifications and production verification are future implementation tasks.
+## Getting started
+See [backend setup](backend/README.md) and [mobile setup](mobile/README.md). CI runs backend Prisma validation/build and mobile TypeScript checks on pushes and pull requests.

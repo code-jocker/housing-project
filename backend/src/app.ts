@@ -17,7 +17,7 @@ app.use(express.json({ limit: '1mb' }));
 app.use(rateLimit({ windowMs: 15 * 60 * 1000, limit: 200, standardHeaders: 'draft-8', legacyHeaders: false }));
 app.get('/', (_req, res) => res.json({ name: 'HousingConnect API', version: '1.0.0', docs: 'See README.md for endpoints.' }));
 app.use('/api/v1/health', healthRouter);
-app.use('/api/v1/auth', authRouter);
+app.use('/api/v1/auth', rateLimit({ windowMs: 15 * 60 * 1000, limit: 12, standardHeaders: 'draft-8', legacyHeaders: false }), authRouter);
 app.use('/api/v1/properties', propertiesRouter);
 app.use('/api/v1/marketplace', marketplaceRouter);
 app.use('/api/v1/admin', adminRouter);

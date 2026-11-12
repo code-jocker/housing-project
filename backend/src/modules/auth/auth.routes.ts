@@ -14,7 +14,7 @@ const registerSchema = z.object({
   phone: z.string().trim().regex(/^\+?[0-9]{9,15}$/, 'Enter a valid phone number with country code.'),
   email: z.email().optional(),
   password: z.string().min(8).max(72),
-  role: z.enum(['TENANT', 'LANDLORD', 'AGENT']).default('TENANT'),
+  role: z.enum(['TENANT', 'LANDLORD']).default('TENANT'),
 });
 const loginSchema = z.object({ phone: z.string().trim().min(9).max(16), password: z.string().min(8).max(72) });
 
@@ -33,7 +33,8 @@ authRouter.post('/register', asyncHandler(async (req, res) => {
   if (existing) { res.status(409).json({ message: 'A user with that phone number or email already exists.' }); return; }
   const passwordHash = await bcrypt.hash(password, 12);
   const user = await prisma.user.create({ data: { fullName, phone, email, passwordHash, role } });
-  res.status(201).json({ message: 'Account created. Phone verification must be completed before production launch.', token: issueToken(user), user: publicUser(user) });
+  if (env.NODE_ENV === 'production' && !user.phoneVerifiedAt) { res.status(201).json({ message: 'Account created. Phone verification is required before sign-in.', verificationRequired: true }); return; }
+  res.status(201).json({ message: 'Account created.', token: issueToken(user), user: publicUser(user) });
 }));
 
 authRouter.post('/login', asyncHandler(async (req, res) => {
@@ -43,6 +44,7 @@ authRouter.post('/login', asyncHandler(async (req, res) => {
   if (!user || !user.isActive || !(await bcrypt.compare(parsed.data.password, user.passwordHash))) {
     res.status(401).json({ message: 'Incorrect phone number or password.' }); return;
   }
+  if (env.NODE_ENV === 'production' && !user.phoneVerifiedAt) { res.status(403).json({ message: 'Verify your phone number before signing in.' }); return; }
   res.json({ token: issueToken(user), user: publicUser(user) });
 }));
 
