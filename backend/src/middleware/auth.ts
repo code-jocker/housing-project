@@ -4,7 +4,7 @@ import { env } from '../config/env.js';
 import { prisma } from '../config/prisma.js';
 import type { UserRole } from '@prisma/client';
 
-type TokenPayload = { sub: string };
+type TokenPayload = { sub: string; tokenVersion: number };
 
 export async function authenticate(req: Request, res: Response, next: NextFunction) {
   const header = req.headers.authorization;
@@ -15,8 +15,8 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
   try {
     const payload = jwt.verify(header.slice(7), env.JWT_SECRET) as TokenPayload;
     if (!payload.sub) { res.status(401).json({ message: 'Invalid access token.' }); return; }
-    const user = await prisma.user.findUnique({ where: { id: payload.sub }, select: { id: true, role: true, isActive: true } });
-    if (!user || !user.isActive) { res.status(401).json({ message: 'Account not available.' }); return; }
+    const user = await prisma.user.findUnique({ where: { id: payload.sub }, select: { id: true, role: true, isActive: true, tokenVersion: true } });
+    if (!user || !user.isActive || payload.tokenVersion !== user.tokenVersion) { res.status(401).json({ message: 'Account not available.' }); return; }
     req.auth = { userId: user.id, role: user.role as UserRole };
     next();
   } catch {

@@ -19,8 +19,8 @@ const registerSchema = z.object({
 });
 const loginSchema = z.object({ phone: z.string().trim().min(9).max(16), password: z.string().min(8).max(72) });
 
-function issueToken(user: { id: string; role: UserRole }) {
-  return jwt.sign({ role: user.role }, env.JWT_SECRET, { subject: user.id, expiresIn: env.JWT_EXPIRES_IN as jwt.SignOptions['expiresIn'] });
+function issueToken(user: { id: string; role: UserRole; tokenVersion: number }) {
+  return jwt.sign({ role: user.role, tokenVersion: user.tokenVersion }, env.JWT_SECRET, { subject: user.id, expiresIn: env.JWT_EXPIRES_IN as jwt.SignOptions['expiresIn'] });
 }
 function publicUser(user: { id: string; fullName: string; phone: string; email: string | null; role: UserRole; phoneVerifiedAt: Date | null }) {
   return { id: user.id, fullName: user.fullName, phone: user.phone, email: user.email, role: user.role, phoneVerified: Boolean(user.phoneVerifiedAt) };
@@ -59,6 +59,47 @@ authRouter.post('/login', asyncHandler(async (req, res) => {
 }));
 
 
+const passwordResetRequestSchema = z.object({ phone: z.string().trim().regex(/^\+[1-9][0-9]{8,14}$/) });
+authRouter.post('/password-reset/request', asyncHandler(async (req, res) => {
+  const parsed = passwordResetRequestSchema.safeParse(req.body);
+  if (!parsed.success) { res.status(400).json({ message: 'Enter your phone number with country code.' }); return; }
+  const user = await prisma.user.findUnique({ where: { phone: parsed.data.phone }, select: { id: true } });
+  if (!user) { res.status(202).json({ message: 'If an account exists for this number, a reset code will be sent.' }); return; }
+  try {
+    const result = await createAndSendPhoneOtp(parsed.data.phone, 'PASSWORD_RESET');
+    res.status(202).json({ message: result.sent ? 'If an account exists for this number, a reset code will be sent.' : 'Please wait before requesting another code.', ...('waitSeconds' in result ? { waitSeconds: result.waitSeconds } : {}), ...('debugCode' in result ? { debugCode: result.debugCode } : {}) });
+  } catch {
+    res.status(503).json({ message: 'Password reset SMS is temporarily unavailable. Try again later.' });
+  }
+}));
+
+const passwordResetConfirmSchema = z.object({
+  phone: z.string().trim().regex(/^\+[1-9][0-9]{8,14}$/),
+  code: z.string().regex(/^[0-9]{6}$/),
+  newPassword: z.string().min(8).max(72),
+});
+authRouter.post('/password-reset/confirm', asyncHandler(async (req, res) => {
+  const parsed = passwordResetConfirmSchema.safeParse(req.body);
+  if (!parsed.success) { res.status(400).json({ message: 'Enter a valid phone number, 6-digit code and password of at least 8 characters.' }); return; }
+  const { phone, code, newPassword } = parsed.data;
+  const challenge = await prisma.phoneOtp.findUnique({ where: { phone } });
+  if (!challenge || challenge.purpose !== 'PASSWORD_RESET' || challenge.expiresAt <= new Date()) {
+    if (challenge && challenge.expiresAt <= new Date()) await prisma.phoneOtp.delete({ where: { phone } });
+    res.status(400).json({ message: 'The reset code is invalid or expired. Request a new code.' }); return;
+  }
+  if (challenge.attempts >= 5) { res.status(429).json({ message: 'Too many incorrect attempts. Request a new code.' }); return; }
+  if (!verifyPhoneOtpHash(phone, code, challenge.codeHash, 'PASSWORD_RESET')) {
+    await prisma.phoneOtp.update({ where: { phone }, data: { attempts: { increment: 1 } } });
+    res.status(400).json({ message: 'Incorrect reset code.' }); return;
+  }
+  const passwordHash = await bcrypt.hash(newPassword, 12);
+  await prisma.$transaction([
+    prisma.user.update({ where: { phone }, data: { passwordHash, tokenVersion: { increment: 1 } } }),
+    prisma.phoneOtp.delete({ where: { phone } }),
+  ]);
+  res.json({ message: 'Password reset successfully. Sign in using your new password.' });
+}));
+
 const otpRequestSchema = z.object({ phone: z.string().trim().regex(/^\+[1-9][0-9]{8,14}$/) });
 authRouter.post('/otp/request', asyncHandler(async (req, res) => {
   const parsed = otpRequestSchema.safeParse(req.body);
@@ -79,7 +120,7 @@ authRouter.post('/otp/verify', asyncHandler(async (req, res) => {
   if (!parsed.success) { res.status(400).json({ message: 'Enter your phone number and the 6-digit verification code.' }); return; }
   const { phone, code } = parsed.data;
   const challenge = await prisma.phoneOtp.findUnique({ where: { phone } });
-  if (!challenge || challenge.expiresAt <= new Date()) {
+  if (!challenge || challenge.purpose !== 'PHONE_VERIFICATION' || challenge.expiresAt <= new Date()) {
     if (challenge) await prisma.phoneOtp.delete({ where: { phone } });
     res.status(400).json({ message: 'The verification code is invalid or expired. Request a new code.' }); return;
   }

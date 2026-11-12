@@ -2,8 +2,8 @@ import React, { useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { AuthUser, login, register, requestOtp, verifyOtp } from '../services/api';
 
-type Props = { onAuthenticated: (user: AuthUser) => void; onClose: () => void };
-export function AuthScreen({ onAuthenticated, onClose }: Props) {
+type Props = { onAuthenticated: (user: AuthUser) => void; onClose: () => void; onForgotPassword: () => void };
+export function AuthScreen({ onAuthenticated, onClose, onForgotPassword }: Props) {
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('+250');
@@ -88,6 +88,7 @@ export function AuthScreen({ onAuthenticated, onClose }: Props) {
             {!!error && <Text style={styles.error}>{error}</Text>}
             <Pressable onPress={submit} disabled={busy} style={[styles.submit, busy && { opacity: 0.65 }]}>{busy ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.submitText}>{mode === 'login' ? 'Sign in' : 'Create account'}</Text>}</Pressable>
             <Text style={styles.notice}>Use an international phone number beginning with + (for example, +250…). Phone verification is required before production sign-in.</Text>
+            {mode === 'login' && <Pressable onPress={onForgotPassword}><Text style={styles.switch}>Forgot password?</Text></Pressable>}
             <Pressable onPress={() => { setMode(mode === 'login' ? 'register' : 'login'); setError(''); }}><Text style={styles.switch}>{mode === 'login' ? 'New to HousingConnect? Create an account' : 'Already registered? Sign in'}</Text></Pressable>
           </>}
         </ScrollView>

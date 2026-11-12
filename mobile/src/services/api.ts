@@ -157,3 +157,10 @@ export type AdminAuditLog = { id: string; actorId: string; action: string; entit
 export async function getAdminAuditLogs(): Promise<AdminAuditLog[]> {
   return (await request<{ data: AdminAuditLog[] }>('/api/v1/admin/audit-logs?limit=30')).data;
 }
+
+export async function requestPasswordReset(phone: string): Promise<{ message: string; debugCode?: string; waitSeconds?: number }> {
+  return request<{ message: string; debugCode?: string; waitSeconds?: number }>('/api/v1/auth/password-reset/request', { method: 'POST', body: JSON.stringify({ phone }) }, false);
+}
+export async function confirmPasswordReset(phone: string, code: string, newPassword: string): Promise<void> {
+  await request('/api/v1/auth/password-reset/confirm', { method: 'POST', body: JSON.stringify({ phone, code, newPassword }) }, false);
+}

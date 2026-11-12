@@ -11,6 +11,7 @@ import { AdminDashboard } from './src/components/AdminDashboard';
 import { LandlordDashboard } from './src/components/LandlordDashboard';
 import { TenantDashboard } from './src/components/TenantDashboard';
 import { NotificationsScreen } from './src/components/NotificationsScreen';
+import { PasswordResetScreen } from './src/components/PasswordResetScreen';
 
 const money = (value: number) => `RWF ${value.toLocaleString('en-US')}`;
 
@@ -50,6 +51,7 @@ export default function App() {
   const [landlordVisible, setLandlordVisible] = useState(false);
   const [tenantVisible, setTenantVisible] = useState(false);
   const [notificationsVisible, setNotificationsVisible] = useState(false);
+  const [passwordResetVisible, setPasswordResetVisible] = useState(false);
   useEffect(() => { getSession().then(async session => { setUser(session); if (session) { try { const items = await getFavorites(); setSaved(items.map(item => item.id)); } catch { /* Saved-list loading can be retried later. */ } } }); }, []);
   useEffect(() => {
     let active = true;
@@ -101,7 +103,8 @@ export default function App() {
       </View>
     </ScrollView></SafeAreaView>
     {viewingVisible && <ViewingRequestForm propertyId={selected.id} onClose={() => setViewingVisible(false)} onSubmitted={() => { setViewingVisible(false); Alert.alert('Request sent', 'Your viewing request has been sent to the listing owner.'); }} />}
-    {authVisible && <AuthScreen onAuthenticated={onAuthenticated} onClose={() => setAuthVisible(false)} />}
+    {authVisible && <AuthScreen onAuthenticated={onAuthenticated} onClose={() => setAuthVisible(false)} onForgotPassword={() => { setAuthVisible(false); setPasswordResetVisible(true); }} />}
+    {passwordResetVisible && <PasswordResetScreen onClose={() => setPasswordResetVisible(false)} onComplete={() => { setPasswordResetVisible(false); setAuthVisible(true); Alert.alert('Password updated', 'Sign in using your new password.'); }} />}
     </>
   );
 

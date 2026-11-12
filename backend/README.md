@@ -13,7 +13,7 @@ Node.js, Express, TypeScript, Prisma and PostgreSQL API.
 
 ## Routes
 - `GET /api/v1/health`
-- `POST /api/v1/auth/register`, `POST /api/v1/auth/login`, `POST /api/v1/auth/otp/request`, `POST /api/v1/auth/otp/verify`, `GET /api/v1/auth/me`
+- `POST /api/v1/auth/register`, `POST /api/v1/auth/login`, `POST /api/v1/auth/otp/request`, `POST /api/v1/auth/otp/verify`, `POST /api/v1/auth/password-reset/request`, `POST /api/v1/auth/password-reset/confirm`, `GET /api/v1/auth/me`
 - `GET /api/v1/properties`, `GET /api/v1/properties/:id`, `POST /api/v1/properties`, `PATCH /api/v1/properties/:id`, `PATCH /api/v1/properties/:id/availability`
 - Authenticated marketplace: `GET /api/v1/marketplace/my-properties`, `GET /api/v1/marketplace/favorites`, `POST|DELETE /api/v1/marketplace/favorites/:propertyId`, `POST|GET /api/v1/marketplace/viewings`, `PATCH /api/v1/marketplace/viewings/:id`, `POST /api/v1/marketplace/properties/:propertyId/reports`
 - Authenticated property-photo signature: `POST /api/v1/uploads/property-image-signature` (landlord, agent or admin; requires Cloudinary configuration).\n- Authenticated notifications: `GET /api/v1/notifications`, `PATCH /api/v1/notifications/:id/read`, `PATCH /api/v1/notifications/read-all`.
@@ -39,3 +39,6 @@ Replace the number with the actual verified administrator phone. Never expose da
 
 ## Deployment
 See the repository-level `DEPLOYMENT.md` and `render.yaml` for the optional Render Blueprint. Review plan costs and configure all secrets before deploying. Do not expose the API publicly until OTP delivery has been tested on Rwanda networks and document verification, backups, monitoring and local legal review are complete.
+
+## Password recovery
+Password recovery uses a separate OTP purpose and does not mark an unverified phone as verified. Successful resets increment the account token version, invalidating previously issued access tokens. The mobile app includes a reset-password screen. SMS provider credentials are required outside development debug mode.

@@ -38,6 +38,8 @@ test('tenant, landlord and admin marketplace journey', async () => {
   const me = await request(app).get('/api/v1/auth/me').set('Authorization', `Bearer ${tenantToken}`);
   assert.equal(me.status, 200);
   assert.equal(me.body.user.role, 'TENANT');
+  const unknownReset = await request(app).post('/api/v1/auth/password-reset/request').send({ phone: '+250799999999' });
+  assert.equal(unknownReset.status, 202);
 
   const forbiddenCreate = await request(app).post('/api/v1/properties').set('Authorization', `Bearer ${tenantToken}`).send({});
   assert.equal(forbiddenCreate.status, 403);
@@ -122,4 +124,7 @@ test('tenant, landlord and admin marketplace journey', async () => {
   assert.ok(audit.body.data.some((item: { action: string }) => item.action === 'PROPERTY_REVIEWED'));
   assert.ok(audit.body.data.some((item: { action: string }) => item.action === 'VIEWING_STATUS_CHANGED'));
   assert.ok(audit.body.data.some((item: { action: string }) => item.action === 'PROPERTY_REPORTED'));
+  await prisma.user.update({ where: { phone: tenantPhone }, data: { tokenVersion: { increment: 1 } } });
+  const revokedSession = await request(app).get('/api/v1/auth/me').set('Authorization', `Bearer ${tenantToken}`);
+  assert.equal(revokedSession.status, 401);
 });
