@@ -36,3 +36,6 @@ Public registration cannot create ADMIN accounts. After registering and verifyin
 UPDATE "User" SET role = 'ADMIN'::"UserRole" WHERE phone = '+2507XXXXXXXX';
 ```
 Replace the number with the actual verified administrator phone. Never expose database credentials or run this command from a public client.
+
+## Deployment
+See the repository-level `DEPLOYMENT.md` and `render.yaml` for the optional Render Blueprint. Review plan costs and configure all secrets before deploying. Do not expose the API publicly until OTP delivery has been tested on Rwanda networks and document verification, backups, monitoring and local legal review are complete.

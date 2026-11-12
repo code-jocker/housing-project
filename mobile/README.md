@@ -1,23 +1,55 @@
-# HousingConnect mobile app
+# HousingConnect Rwanda — Mobile App
 
-Expo + React Native + TypeScript. The app loads published listings from the API when configured and falls back to sample listings when the API is unavailable.
+Expo + React Native + TypeScript application for Android and iOS.
 
-## Setup
+## Local development
 
-```bash
-npm install
-copy .env.example .env
+1. Install Node.js 20.19.4 or newer.
+2. From this folder, run `npm install`.
+3. Copy `.env.example` to `.env`.
+4. Set `EXPO_PUBLIC_API_URL` to your API address.
+   - Android emulator: use the host address supported by your emulator.
+   - Physical Android phone: use your computer's LAN IP, not `localhost`; both devices must be on the same Wi-Fi.
+   - Deployed API: use its HTTPS URL.
+5. Keep `EXPO_PUBLIC_DEMO_MODE=true` only for local demonstrations. Use `false` for production.
+6. Run `npx expo start`.
+
+## Implemented mobile workflows
+
+- Tenant and landlord registration/login with secure token storage.
+- Phone OTP verification screen.
+- Published property discovery, local search and property-type filters.
+- Saved properties synced with the API.
+- Property detail, viewing request and listing report.
+- Landlord workspace for submitted properties and viewing requests.
+- Tenant workspace for viewing request status and owner contact after acceptance.
+- Admin dashboard for moderation, reports and user management.
+- In-app notifications.
+
+## Android release builds
+
+Install and sign in to EAS CLI:
+
+```powershell
+npm install -g eas-cli
+eas login
+eas build:configure
 ```
 
-Set `EXPO_PUBLIC_API_URL` in `.env` to your API base URL. For a physical phone, use your computer's LAN IP address, not `localhost`, and ensure both devices share the same Wi-Fi network. Example: `http://192.168.1.20:8000`.
+Create an internal testing APK:
 
-Start Expo:
-
-```bash
-npx expo start
+```powershell
+eas build --platform android --profile preview
 ```
 
-The API client currently includes public property listing, registration and login methods. The login/register UI, secure token storage and appointment/favorites screens are not yet wired into the app.
+Create a Play Store Android App Bundle:
+
+```powershell
+eas build --platform android --profile production
+```
+
+Before a public build, configure the production API URL, set demo mode to false, test OTP delivery on Rwanda mobile networks, add final app icon/splash assets, complete privacy/legal review and run real-device acceptance tests.
 
 ## Demo data safety
-Set `EXPO_PUBLIC_DEMO_MODE=true` only for local demonstrations. Demo properties are fictional examples, not real rental offers. Set `EXPO_PUBLIC_DEMO_MODE=false` (or omit it) for production builds. Production mode displays an empty state instead of inventing listings when the API is empty or unavailable.
+
+Demo properties are fictional examples, not real rental offers. When demo mode is false, the app shows an empty state if the API has no published listings or cannot be reached; it does not invent properties.
