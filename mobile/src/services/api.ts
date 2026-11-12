@@ -98,3 +98,14 @@ export async function getAdminReports(): Promise<AdminReport[]> {
 export async function resolveAdminReport(id: string) {
   return request('/api/v1/admin/reports/' + encodeURIComponent(id), { method: 'PATCH', body: JSON.stringify({ resolved: true }) });
 }
+
+export type OwnerViewing = { id: string; preferredAt: string; message: string | null; status: string; property: { id: string; title: string; district: string; sector: string; ownerId: string }; tenant: { id: string; fullName: string; phone: string } };
+export async function getMyViewings(): Promise<OwnerViewing[]> {
+  return (await request<{ data: OwnerViewing[] }>('/api/v1/marketplace/viewings')).data;
+}
+export async function updateViewing(id: string, status: 'ACCEPTED' | 'DECLINED' | 'COMPLETED' | 'CANCELLED') {
+  return request('/api/v1/marketplace/viewings/' + encodeURIComponent(id), { method: 'PATCH', body: JSON.stringify({ status }) });
+}
+export async function setPropertyAvailability(id: string, available: boolean) {
+  return request('/api/v1/properties/' + encodeURIComponent(id) + '/availability', { method: 'PATCH', body: JSON.stringify({ available }) });
+}

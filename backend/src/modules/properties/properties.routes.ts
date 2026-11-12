@@ -68,3 +68,15 @@ propertiesRouter.patch('/:id', authenticate, allowRoles(UserRole.LANDLORD, UserR
   const updated = await prisma.property.update({ where: { id: current.id }, data: { ...data, status: req.auth!.role === UserRole.ADMIN ? current.status : PropertyStatus.PENDING_REVIEW, ...(images ? { images: { deleteMany: {}, create: images.map((url, sortOrder) => ({ url, sortOrder })) } } : {}) }, include: { images: true } });
   res.json({ message: 'Property updated. Changes are pending review.', data: updated });
 }));
+
+const availabilitySchema = z.object({ available: z.boolean() });
+propertiesRouter.patch('/:id/availability', authenticate, allowRoles(UserRole.LANDLORD, UserRole.AGENT, UserRole.ADMIN), asyncHandler(async (req, res) => {
+  const parsed = availabilitySchema.safeParse(req.body);
+  if (!parsed.success) { res.status(400).json({ message: 'Choose whether the property is available.' }); return; }
+  const current = await prisma.property.findUnique({ where: { id: req.params.id } });
+  if (!current) { res.status(404).json({ message: 'Property not found.' }); return; }
+  if (current.ownerId !== req.auth!.userId && req.auth!.role !== UserRole.ADMIN) { res.status(403).json({ message: 'You cannot update this property.' }); return; }
+  const status = parsed.data.available ? PropertyStatus.PENDING_REVIEW : PropertyStatus.RENTED;
+  const data = await prisma.property.update({ where: { id: current.id }, data: { available: parsed.data.available, status } });
+  res.json({ message: parsed.data.available ? 'Listing submitted for review before becoming available again.' : 'Listing marked as rented/unavailable.', data });
+}));
