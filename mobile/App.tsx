@@ -33,9 +33,11 @@ function PropertyCard({ item, saved, onSave, onOpen }: { item: Property; saved: 
 export default function App() {
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState('All');
+  const [showSaved, setShowSaved] = useState(false);
+  const demoMode = process.env.EXPO_PUBLIC_DEMO_MODE === 'true';
   const [saved, setSaved] = useState<string[]>([]);
   const [selected, setSelected] = useState<Property | null>(null);
-  const [listingData, setListingData] = useState<Property[]>(properties);
+  const [listingData, setListingData] = useState<Property[]>(demoMode ? properties : []);
   const [loadingListings, setLoadingListings] = useState(true);
   const [apiMessage, setApiMessage] = useState('');
   const [user, setUser] = useState<AuthUser | null>(null);
@@ -50,17 +52,18 @@ export default function App() {
     getProperties().then(items => {
       if (!active) return;
       if (items.length > 0) setListingData(items.map(item => ({ id: item.id, title: item.title, district: item.district, sector: item.sector, rent: item.monthlyRentRwf, bedrooms: item.bedrooms, bathrooms: item.bathrooms, type: item.propertyType as Property['type'], image: item.images[0]?.url || properties[0].image, verified: Boolean(item.verifiedAt), available: item.available, furnished: item.furnished, description: item.description })));
-      setApiMessage(items.length ? 'Live listings' : 'Showing demo listings until approved properties are published.');
-    }).catch(() => { if (active) setApiMessage('API unavailable — showing sample listings.'); })
+      else setListingData(demoMode ? properties : []);
+      setApiMessage(items.length ? 'Live listings' : demoMode ? 'Demo listings — not real rental offers.' : 'No published properties are available yet.');
+    }).catch(() => { if (active) { setListingData(demoMode ? properties : []); setApiMessage(demoMode ? 'API unavailable — demo listings only, not real offers.' : 'Unable to connect to listings. Check your connection and try again.'); } })
       .finally(() => { if (active) setLoadingListings(false); });
     return () => { active = false; };
   }, []);
   const filtered = useMemo(() => listingData.filter(p => {
     const q = query.trim().toLowerCase();
     const matchesQuery = !q || `${p.title} ${p.district} ${p.sector} ${p.type}`.toLowerCase().includes(q);
-    const matchesFilter = filter === 'All' || (filter === 'Verified' ? p.verified : p.type === filter);
-    return matchesQuery && matchesFilter && p.available;
-  }), [query, filter]);
+    const matchesFilter = filter === 'All' || p.type === filter;
+    return matchesQuery && matchesFilter && p.available && (!showSaved || saved.includes(p.id));
+  }), [query, filter, showSaved, saved]);
   const toggleSave = async (id: string) => {
     if (!user) { setAuthVisible(true); return; }
     const alreadySaved = saved.includes(id);
@@ -95,14 +98,14 @@ export default function App() {
       <View style={styles.hero}><Text style={styles.eyebrow}>YOUR NEXT HOME STARTS HERE</Text><Text style={styles.heroTitle}>Find a home that fits your life.</Text><Text style={styles.heroSub}>Explore rental homes across Rwanda with clearer prices and safer listings.</Text>
         <View style={styles.searchBox}><Text style={styles.searchIcon}>⌕</Text><TextInput value={query} onChangeText={setQuery} placeholder="Search district, sector or property" placeholderTextColor="#8292A6" style={styles.searchInput} /></View>
       </View>
-      <View style={styles.content}><View style={styles.headingRow}><Text style={styles.sectionTitle}>Explore properties</Text><Text style={styles.count}>{filtered.length} found</Text></View>
+      <View style={styles.content}><View style={styles.headingRow}><Text style={styles.sectionTitle}>{showSaved ? 'Saved properties' : 'Explore properties'}</Text><Text style={styles.count}>{filtered.length} found</Text></View>
         {!!apiMessage && <Text style={styles.apiNotice}>{apiMessage}</Text>}
         {loadingListings && <Text style={styles.apiNotice}>Checking for new listings…</Text>}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filters}>{['All', 'Verified', 'Apartment', 'House', 'Studio'].map(option => <Pressable key={option} onPress={() => setFilter(option)} style={[styles.filter, filter === option && styles.filterActive]}><Text style={[styles.filterText, filter === option && styles.filterTextActive]}>{option}</Text></Pressable>)}</ScrollView>
         {filtered.map(item => <PropertyCard key={item.id} item={item} saved={saved.includes(item.id)} onSave={() => toggleSave(item.id)} onOpen={() => setSelected(item)} />)}
         {filtered.length === 0 && <View style={styles.empty}><Text style={styles.emptyTitle}>No properties found</Text><Text style={styles.description}>Try another district, sector or property type.</Text></View>}
       </View>
-    </ScrollView><View style={styles.tabBar}><Text style={styles.tabActive}>⌂  Explore</Text><Text style={styles.tab}>♡  Saved ({saved.length})</Text><Pressable onPress={() => { if (!user) setAuthVisible(true); else if (user.role === 'LANDLORD' || user.role === 'AGENT') setListingVisible(true); else Alert.alert('Landlord account required', 'Use a landlord or agent account to publish a property.'); }}><Text style={styles.tab}>＋  List a home</Text></Pressable><Pressable onPress={() => user?.role === 'ADMIN' ? setAdminVisible(true) : user?.role === 'LANDLORD' || user?.role === 'AGENT' ? setLandlordVisible(true) : user ? onLogout() : setAuthVisible(true)}><Text style={styles.tab}>{user?.role === 'ADMIN' ? 'Admin' : user?.role === 'LANDLORD' || user?.role === 'AGENT' ? 'My listings' : user ? '↪ Sign out' : '☻ Profile'}</Text></Pressable></View></SafeAreaView>
+    </ScrollView><View style={styles.tabBar}><Pressable onPress={() => setShowSaved(false)}><Text style={!showSaved ? styles.tabActive : styles.tab}>⌂  Explore</Text></Pressable><Pressable onPress={() => { if (!user) setAuthVisible(true); else setShowSaved(true); }}><Text style={showSaved ? styles.tabActive : styles.tab}>♡  Saved ({saved.length})</Text></Pressable><Pressable onPress={() => { if (!user) setAuthVisible(true); else if (user.role === 'LANDLORD' || user.role === 'AGENT') setListingVisible(true); else Alert.alert('Landlord account required', 'Use a landlord or agent account to publish a property.'); }}><Text style={styles.tab}>＋  List a home</Text></Pressable><Pressable onPress={() => user?.role === 'ADMIN' ? setAdminVisible(true) : user?.role === 'LANDLORD' || user?.role === 'AGENT' ? setLandlordVisible(true) : user ? onLogout() : setAuthVisible(true)}><Text style={styles.tab}>{user?.role === 'ADMIN' ? 'Admin' : user?.role === 'LANDLORD' || user?.role === 'AGENT' ? 'My listings' : user ? '↪ Sign out' : '☻ Profile'}</Text></Pressable></View></SafeAreaView>
     {authVisible && <AuthScreen onAuthenticated={onAuthenticated} onClose={() => setAuthVisible(false)} />}
     {adminVisible && <AdminDashboard onClose={() => setAdminVisible(false)} />}
     {landlordVisible && <LandlordDashboard onClose={() => setLandlordVisible(false)} />}

@@ -18,3 +18,6 @@ npx expo start
 ```
 
 The API client currently includes public property listing, registration and login methods. The login/register UI, secure token storage and appointment/favorites screens are not yet wired into the app.
+
+## Demo data safety
+Set `EXPO_PUBLIC_DEMO_MODE=true` only for local demonstrations. Demo properties are fictional examples, not real rental offers. Set `EXPO_PUBLIC_DEMO_MODE=false` (or omit it) for production builds. Production mode displays an empty state instead of inventing listings when the API is empty or unavailable.
