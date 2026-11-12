@@ -1,10 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { SafeAreaView, View, Text, TextInput, ScrollView, Image, Pressable, StyleSheet, StatusBar } from 'react-native';
+import { SafeAreaView, View, Text, TextInput, ScrollView, Image, Pressable, StyleSheet, Alert } from 'react-native';
 import { StatusBar as ExpoStatusBar } from 'expo-status-bar';
 import { properties, Property } from './src/data/properties';
 import { colors } from './src/theme';
 import { addFavorite, AuthUser, getFavorites, getProperties, getSession, logout, removeFavorite } from './src/services/api';
 import { AuthScreen } from './src/components/AuthScreen';
+import { ViewingRequestForm } from './src/components/ViewingRequestForm';
+import { CreateListingForm } from './src/components/CreateListingForm';
 
 const money = (value: number) => `RWF ${value.toLocaleString('en-US')}`;
 
@@ -36,6 +38,8 @@ export default function App() {
   const [apiMessage, setApiMessage] = useState('');
   const [user, setUser] = useState<AuthUser | null>(null);
   const [authVisible, setAuthVisible] = useState(false);
+  const [viewingVisible, setViewingVisible] = useState(false);
+  const [listingVisible, setListingVisible] = useState(false);
   useEffect(() => { getSession().then(async session => { setUser(session); if (session) { try { const items = await getFavorites(); setSaved(items.map(item => item.id)); } catch { /* Saved-list loading can be retried later. */ } } }); }, []);
   useEffect(() => {
     let active = true;
@@ -50,7 +54,7 @@ export default function App() {
   const filtered = useMemo(() => listingData.filter(p => {
     const q = query.trim().toLowerCase();
     const matchesQuery = !q || `${p.title} ${p.district} ${p.sector} ${p.type}`.toLowerCase().includes(q);
-    const matchesFilter = filter === 'All' || (filter === 'Verified' ? p.verified : p.type === filter);
+    const matchesFilter = filter === 'All' || p.type === filter;
     return matchesQuery && matchesFilter && p.available;
   }), [query, filter]);
   const toggleSave = async (id: string) => {
@@ -64,6 +68,7 @@ export default function App() {
   const onLogout = async () => { await logout(); setUser(null); setSaved([]); setAuthVisible(false); };
 
   if (selected) return (
+    <>
     <SafeAreaView style={styles.safe}><ExpoStatusBar style="dark" /><ScrollView>
       <Pressable style={styles.back} onPress={() => setSelected(null)}><Text style={styles.backText}>‹  Back to listings</Text></Pressable>
       <Image source={{ uri: selected.image }} style={styles.detailPhoto} />
@@ -71,9 +76,12 @@ export default function App() {
         <View style={styles.metaRow}><Text style={styles.meta}>{selected.bedrooms} bedrooms</Text><Text style={styles.meta}>{selected.bathrooms} bathrooms</Text><Text style={styles.meta}>{selected.type}</Text></View>
         <Text style={styles.sectionTitle}>About this property</Text><Text style={styles.description}>{selected.description}</Text>
         <Text style={styles.sectionTitle}>Listing status</Text><Text style={styles.description}>{selected.verified ? 'Identity/listing review badge shown in this demo. Confirm ownership or authority to rent separately.' : 'This listing has not yet been verified. Exercise caution before paying any money.'}</Text>
-        <Pressable style={styles.primaryButton} onPress={() => alert('Viewing requests will be available after the backend is connected.')}><Text style={styles.primaryButtonText}>Request a viewing</Text></Pressable>
+        <Pressable style={styles.primaryButton} onPress={() => { if (!user) { setSelected(null); setAuthVisible(true); } else if (user.role !== 'TENANT') { Alert.alert('Tenant account required', 'Sign in with a tenant account to request a viewing.'); } else { setViewingVisible(true); } }}><Text style={styles.primaryButtonText}>Request a viewing</Text></Pressable>
       </View>
     </ScrollView></SafeAreaView>
+    {viewingVisible && <ViewingRequestForm propertyId={selected.id} onClose={() => setViewingVisible(false)} onSubmitted={() => { setViewingVisible(false); Alert.alert('Request sent', 'Your viewing request has been sent to the listing owner.'); }} />}
+    {authVisible && <AuthScreen onAuthenticated={onAuthenticated} onClose={() => setAuthVisible(false)} />}
+    </>
   );
 
   return (
@@ -86,12 +94,13 @@ export default function App() {
       <View style={styles.content}><View style={styles.headingRow}><Text style={styles.sectionTitle}>Explore properties</Text><Text style={styles.count}>{filtered.length} found</Text></View>
         {!!apiMessage && <Text style={styles.apiNotice}>{apiMessage}</Text>}
         {loadingListings && <Text style={styles.apiNotice}>Checking for new listings…</Text>}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filters}>{['All', 'Verified', 'Apartment', 'House', 'Studio'].map(option => <Pressable key={option} onPress={() => setFilter(option)} style={[styles.filter, filter === option && styles.filterActive]}><Text style={[styles.filterText, filter === option && styles.filterTextActive]}>{option}</Text></Pressable>)}</ScrollView>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filters}>{['All', 'Apartment', 'House', 'Studio'].map(option => <Pressable key={option} onPress={() => setFilter(option)} style={[styles.filter, filter === option && styles.filterActive]}><Text style={[styles.filterText, filter === option && styles.filterTextActive]}>{option}</Text></Pressable>)}</ScrollView>
         {filtered.map(item => <PropertyCard key={item.id} item={item} saved={saved.includes(item.id)} onSave={() => toggleSave(item.id)} onOpen={() => setSelected(item)} />)}
         {filtered.length === 0 && <View style={styles.empty}><Text style={styles.emptyTitle}>No properties found</Text><Text style={styles.description}>Try another district, sector or property type.</Text></View>}
       </View>
-    </ScrollView><View style={styles.tabBar}><Text style={styles.tabActive}>⌂  Explore</Text><Text style={styles.tab}>♡  Saved ({saved.length})</Text><Text style={styles.tab}>＋  List a home</Text><Pressable onPress={() => user ? onLogout() : setAuthVisible(true)}><Text style={styles.tab}>{user ? '↪ Sign out' : '☻ Profile'}</Text></Pressable></View></SafeAreaView>
+    </ScrollView><View style={styles.tabBar}><Text style={styles.tabActive}>⌂  Explore</Text><Text style={styles.tab}>♡  Saved ({saved.length})</Text><Pressable onPress={() => { if (!user) setAuthVisible(true); else if (user.role === 'LANDLORD' || user.role === 'AGENT') setListingVisible(true); else Alert.alert('Landlord account required', 'Use a landlord or agent account to publish a property.'); }}><Text style={styles.tab}>＋  List a home</Text></Pressable><Pressable onPress={() => user ? onLogout() : setAuthVisible(true)}><Text style={styles.tab}>{user ? '↪ Sign out' : '☻ Profile'}</Text></Pressable></View></SafeAreaView>
     {authVisible && <AuthScreen onAuthenticated={onAuthenticated} onClose={() => setAuthVisible(false)} />}
+    {listingVisible && <CreateListingForm onClose={() => setListingVisible(false)} onCreated={async () => { setListingVisible(false); Alert.alert('Listing submitted', 'Your property is pending platform review.'); try { const items = await getProperties(); if (items.length) setListingData(items.map(item => ({ id: item.id, title: item.title, district: item.district, sector: item.sector, rent: item.monthlyRentRwf, bedrooms: item.bedrooms, bathrooms: item.bathrooms, type: item.propertyType as Property['type'], image: item.images[0]?.url || properties[0].image, verified: Boolean(item.verifiedAt), available: item.available, furnished: item.furnished, description: item.description }))); } catch { /* Refresh can be retried when the feed reloads. */ } }} />}
     </>
   );
 }

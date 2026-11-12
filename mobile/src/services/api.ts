@@ -64,3 +64,18 @@ export async function addFavorite(propertyId: string) {
 export async function removeFavorite(propertyId: string) {
   return request('/api/v1/marketplace/favorites/' + encodeURIComponent(propertyId), { method: 'DELETE' });
 }
+
+export type CreatePropertyInput = {
+  title: string; description: string; propertyType: 'Apartment' | 'House' | 'Studio' | 'Room' | 'Commercial';
+  district: string; sector: string; monthlyRentRwf: number; depositRwf: number;
+  bedrooms: number; bathrooms: number; images: string[];
+};
+export async function createProperty(input: CreatePropertyInput) {
+  return request<{ message: string; data: ApiProperty }>('/api/v1/properties', { method: 'POST', body: JSON.stringify(input) });
+}
+export async function createViewingRequest(input: { propertyId: string; preferredAt: string; message?: string }) {
+  return request<{ message: string; data: { id: string; status: string } }>('/api/v1/marketplace/viewings', { method: 'POST', body: JSON.stringify(input) });
+}
+export async function getMyProperties(): Promise<ApiProperty[]> {
+  return (await request<{ data: ApiProperty[] }>('/api/v1/marketplace/my-properties')).data;
+}
