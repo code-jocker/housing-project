@@ -109,6 +109,10 @@ test('tenant, landlord and admin marketplace journey', async () => {
   const tenantViewings = await request(app).get('/api/v1/marketplace/viewings').set('Authorization', `Bearer ${tenantToken}`);
   assert.equal(tenantViewings.status, 200);
   assert.equal(tenantViewings.body.data[0].property.owner.phone, landlordPhone);
+  const completedByLandlord = await request(app).patch(`/api/v1/marketplace/viewings/${viewingId}`).set('Authorization', `Bearer ${landlordToken}`).send({ status: 'COMPLETED' });
+  assert.equal(completedByLandlord.status, 200);
+  const cancelCompleted = await request(app).patch(`/api/v1/marketplace/viewings/${viewingId}`).set('Authorization', `Bearer ${tenantToken}`).send({ status: 'CANCELLED' });
+  assert.equal(cancelCompleted.status, 409);
   const tenantNotifications = await request(app).get('/api/v1/notifications').set('Authorization', `Bearer ${tenantToken}`);
   assert.ok(tenantNotifications.body.data.some((item: { type: string }) => item.type === 'VIEWING_UPDATE'));
 

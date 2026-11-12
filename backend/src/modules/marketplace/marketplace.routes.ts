@@ -98,7 +98,10 @@ marketplaceRouter.patch('/viewings/:id', asyncHandler(async (req, res) => {
   if (!isAdmin && ((isOwner && !ownerTransitions.includes(next)) || (isTenant && !tenantTransitions.includes(next)))) {
     res.status(403).json({ message: 'Only the listing owner can accept, decline or complete a request. Tenants can cancel their own request.' }); return;
   }
-  if (current.status !== ViewingStatus.REQUESTED && !(current.status === ViewingStatus.ACCEPTED && next === ViewingStatus.COMPLETED) && next !== ViewingStatus.CANCELLED) {
+  const canCancel = next === ViewingStatus.CANCELLED && [ViewingStatus.REQUESTED, ViewingStatus.ACCEPTED].includes(current.status);
+  const canComplete = current.status === ViewingStatus.ACCEPTED && next === ViewingStatus.COMPLETED;
+  const canRespond = current.status === ViewingStatus.REQUESTED && [ViewingStatus.ACCEPTED, ViewingStatus.DECLINED].includes(next);
+  if (!canCancel && !canComplete && !canRespond) { res.status(409).json({ message: 'This viewing request can no longer be changed.' }); return; }
     res.status(409).json({ message: 'This viewing request can no longer be changed to that status.' }); return;
   }
   const data = await prisma.viewingRequest.update({ where: { id: current.id }, data: { status: next } });
