@@ -9,7 +9,8 @@
     "start": "node dist/server.js",
     "prismaGenerate": "prisma generate",
     "prismaMigrate": "prisma migrate dev",
-    "prismaStudio": "prisma studio"
+    "prismaStudio": "prisma studio",
+    "test": "tsx --test test/*.test.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.19.0",
@@ -30,6 +31,8 @@
     "@types/node": "^24.10.1",
     "prisma": "^6.19.0",
     "tsx": "^4.20.6",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "supertest": "^7.1.4",
+    "@types/supertest": "^6.0.3"
   }
 }
