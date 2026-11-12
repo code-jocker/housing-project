@@ -38,6 +38,7 @@ export function CreateListingForm({ onClose, onCreated }: Props) {
       setError('Complete the required fields. Rent, deposit and room counts must be valid whole numbers.'); return;
     }
     const images=uploadedImages;
+    if (images.length === 0) { setError('Upload at least one clear photo of the property.'); return; }
     setBusy(true);
     try { await createProperty({title:title.trim(),description:description.trim(),propertyType,district:district.trim(),sector:sector.trim(),monthlyRentRwf,depositRwf,bedrooms:bedroomCount,bathrooms:bathroomCount,images}); onCreated(); }
     catch(e) { setError(e instanceof Error?e.message:'Could not submit your listing.'); }
