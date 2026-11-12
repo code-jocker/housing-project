@@ -154,3 +154,16 @@ model Notification {
   createdAt DateTime @default(now())
   @@index([userId, readAt, createdAt])
 }
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorId    String
+  action     String
+  entityType String
+  entityId   String
+  details    String?
+  createdAt  DateTime @default(now())
+  @@index([createdAt])
+  @@index([entityType, entityId])
+  @@index([actorId, createdAt])
+}

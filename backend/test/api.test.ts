@@ -117,4 +117,9 @@ test('tenant, landlord and admin marketplace journey', async () => {
   assert.ok(adminNotifications.body.data.some((item: { type: string }) => item.type === 'PROPERTY_REPORTED'));
   const markedRead = await request(app).patch('/api/v1/notifications/read-all').set('Authorization', `Bearer ${adminToken}`);
   assert.equal(markedRead.status, 200);
+  const audit = await request(app).get('/api/v1/admin/audit-logs?limit=100').set('Authorization', `Bearer ${adminToken}`);
+  assert.equal(audit.status, 200);
+  assert.ok(audit.body.data.some((item: { action: string }) => item.action === 'PROPERTY_REVIEWED'));
+  assert.ok(audit.body.data.some((item: { action: string }) => item.action === 'VIEWING_STATUS_CHANGED'));
+  assert.ok(audit.body.data.some((item: { action: string }) => item.action === 'PROPERTY_REPORTED'));
 });

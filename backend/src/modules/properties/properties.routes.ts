@@ -6,6 +6,7 @@ import { authenticate, allowRoles } from '../../middleware/auth.js';
 import { asyncHandler } from '../../utils/async-handler.js';
 import { env } from '../../config/env.js';
 import { notifyAdminsSafely } from '../notifications/notifications.service.js';
+import { recordAuditLogSafely } from '../audit/audit.service.js';
 
 export const propertiesRouter = Router();
 const propertySchema = z.object({
@@ -69,6 +70,7 @@ propertiesRouter.post('/', authenticate, allowRoles(UserRole.LANDLORD, UserRole.
   }
   const { images, ...data } = parsed.data;
   const property = await prisma.property.create({ data: { ...data, ownerId: req.auth!.userId, status: PropertyStatus.PENDING_REVIEW, images: { create: images.map((url, sortOrder) => ({ url, sortOrder })) } }, include: { images: true } });
+  await recordAuditLogSafely(req.auth!.userId, 'PROPERTY_CREATED', 'Property', property.id);
   await notifyAdminsSafely('LISTING_SUBMITTED', 'New listing submitted', `${property.title} is waiting for moderation.`);
   res.status(201).json({ message: 'Property submitted for review.', data: property });
 }));
@@ -81,6 +83,7 @@ propertiesRouter.patch('/:id', authenticate, allowRoles(UserRole.LANDLORD, UserR
   if (!parsed.success) { res.status(400).json({ message: 'Invalid property details.', errors: parsed.error.flatten() }); return; }
   const { images, ...data } = parsed.data;
   const updated = await prisma.property.update({ where: { id: current.id }, data: { ...data, status: req.auth!.role === UserRole.ADMIN ? current.status : PropertyStatus.PENDING_REVIEW, ...(images ? { images: { deleteMany: {}, create: images.map((url, sortOrder) => ({ url, sortOrder })) } } : {}) }, include: { images: true } });
+  await recordAuditLogSafely(req.auth!.userId, 'PROPERTY_UPDATED', 'Property', current.id);
   res.json({ message: 'Property updated. Changes are pending review.', data: updated });
 }));
 
@@ -93,6 +96,7 @@ propertiesRouter.patch('/:id/availability', authenticate, allowRoles(UserRole.LA
   if (current.ownerId !== req.auth!.userId && req.auth!.role !== UserRole.ADMIN) { res.status(403).json({ message: 'You cannot update this property.' }); return; }
   const status = parsed.data.available ? PropertyStatus.PENDING_REVIEW : PropertyStatus.RENTED;
   const data = await prisma.property.update({ where: { id: current.id }, data: { available: parsed.data.available, status } });
+  await recordAuditLogSafely(req.auth!.userId, 'PROPERTY_AVAILABILITY_CHANGED', 'Property', current.id, JSON.stringify({ available: parsed.data.available }));
   if (parsed.data.available) await notifyAdminsSafely('LISTING_RELISTED', 'Listing submitted for review', `${data.title} was submitted for review again.`);
   res.json({ message: parsed.data.available ? 'Listing submitted for review before becoming available again.' : 'Listing marked as rented/unavailable.', data });
 }));
