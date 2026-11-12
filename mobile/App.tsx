@@ -54,7 +54,7 @@ export default function App() {
   const filtered = useMemo(() => listingData.filter(p => {
     const q = query.trim().toLowerCase();
     const matchesQuery = !q || `${p.title} ${p.district} ${p.sector} ${p.type}`.toLowerCase().includes(q);
-    const matchesFilter = filter === 'All' || p.type === filter;
+    const matchesFilter = filter === 'All' || (filter === 'Verified' ? p.verified : p.type === filter);
     return matchesQuery && matchesFilter && p.available;
   }), [query, filter]);
   const toggleSave = async (id: string) => {
@@ -94,7 +94,7 @@ export default function App() {
       <View style={styles.content}><View style={styles.headingRow}><Text style={styles.sectionTitle}>Explore properties</Text><Text style={styles.count}>{filtered.length} found</Text></View>
         {!!apiMessage && <Text style={styles.apiNotice}>{apiMessage}</Text>}
         {loadingListings && <Text style={styles.apiNotice}>Checking for new listings…</Text>}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filters}>{['All', 'Apartment', 'House', 'Studio'].map(option => <Pressable key={option} onPress={() => setFilter(option)} style={[styles.filter, filter === option && styles.filterActive]}><Text style={[styles.filterText, filter === option && styles.filterTextActive]}>{option}</Text></Pressable>)}</ScrollView>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filters}>{['All', 'Verified', 'Apartment', 'House', 'Studio'].map(option => <Pressable key={option} onPress={() => setFilter(option)} style={[styles.filter, filter === option && styles.filterActive]}><Text style={[styles.filterText, filter === option && styles.filterTextActive]}>{option}</Text></Pressable>)}</ScrollView>
         {filtered.map(item => <PropertyCard key={item.id} item={item} saved={saved.includes(item.id)} onSave={() => toggleSave(item.id)} onOpen={() => setSelected(item)} />)}
         {filtered.length === 0 && <View style={styles.empty}><Text style={styles.emptyTitle}>No properties found</Text><Text style={styles.description}>Try another district, sector or property type.</Text></View>}
       </View>

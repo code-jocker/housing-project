@@ -7,9 +7,9 @@ Node.js, Express, TypeScript, Prisma and PostgreSQL API.
 2. Copy `.env.example` to `.env` and configure `DATABASE_URL` and a random `JWT_SECRET` of at least 32 characters.
 3. Run `npm install`.
 4. Run `npx prisma generate`.
-5. Run `npx prisma migrate dev --name init`.
+5. Run `npx prisma migrate dev` to apply the committed database migrations.
 6. Run `npm run dev`. The API listens on port 8000 by default.
-7. Run `npm run build` before deployment.
+7. Run `npm run build` before deployment. For production, run `npx prisma migrate deploy` as a release step.
 
 ## Routes
 - `GET /api/v1/health`
@@ -28,3 +28,10 @@ Never commit `.env`, credentials, private keys, OTPs or identity documents. Use 
 
 ## Phone OTP configuration
 Set `AFRICASTALKING_USERNAME`, `AFRICASTALKING_API_KEY` and, if approved for your account, `AFRICASTALKING_SENDER_ID`. Apply the Prisma schema with `npx prisma migrate dev --name phone_otp`. In development only, `OTP_DEBUG=true` returns a debug code for local testing; set `OTP_DEBUG=false` in production. Production mode requires SMS credentials and does not issue a session until the phone is verified. OTPs expire after 10 minutes, are limited to five verification attempts and can be resent no more than once per minute per phone number.
+
+## First administrator account
+Public registration cannot create ADMIN accounts. After registering and verifying the designated administrator account, promote it through a controlled database session:
+```sql
+UPDATE "User" SET role = 'ADMIN'::"UserRole" WHERE phone = '+2507XXXXXXXX';
+```
+Replace the number with the actual verified administrator phone. Never expose database credentials or run this command from a public client.
