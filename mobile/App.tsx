@@ -7,6 +7,7 @@ import { addFavorite, AuthUser, getFavorites, getProperties, getSession, logout,
 import { AuthScreen } from './src/components/AuthScreen';
 import { ViewingRequestForm } from './src/components/ViewingRequestForm';
 import { CreateListingForm } from './src/components/CreateListingForm';
+import { AdminDashboard } from './src/components/AdminDashboard';
 
 const money = (value: number) => `RWF ${value.toLocaleString('en-US')}`;
 
@@ -40,6 +41,7 @@ export default function App() {
   const [authVisible, setAuthVisible] = useState(false);
   const [viewingVisible, setViewingVisible] = useState(false);
   const [listingVisible, setListingVisible] = useState(false);
+  const [adminVisible, setAdminVisible] = useState(false);
   useEffect(() => { getSession().then(async session => { setUser(session); if (session) { try { const items = await getFavorites(); setSaved(items.map(item => item.id)); } catch { /* Saved-list loading can be retried later. */ } } }); }, []);
   useEffect(() => {
     let active = true;
@@ -87,7 +89,7 @@ export default function App() {
   return (
     <>
     <SafeAreaView style={styles.safe}><ExpoStatusBar style="dark" /><ScrollView showsVerticalScrollIndicator={false}>
-      <View style={styles.header}><View><Text style={styles.brand}>HousingConnect</Text><Text style={styles.country}>RWANDA · FIND A PLACE TO CALL HOME</Text></View><Pressable style={styles.avatar} onPress={() => user ? onLogout() : setAuthVisible(true)}><Text style={styles.avatarText}>{user ? '↪' : 'HC'}</Text></Pressable></View>
+      <View style={styles.header}><View><Text style={styles.brand}>HousingConnect</Text><Text style={styles.country}>RWANDA · FIND A PLACE TO CALL HOME</Text></View><Pressable style={styles.avatar} onPress={() => user?.role === 'ADMIN' ? setAdminVisible(true) : user ? onLogout() : setAuthVisible(true)}><Text style={styles.avatarText}>{user?.role === 'ADMIN' ? 'AD' : user ? '↪' : 'HC'}</Text></Pressable></View>
       <View style={styles.hero}><Text style={styles.eyebrow}>YOUR NEXT HOME STARTS HERE</Text><Text style={styles.heroTitle}>Find a home that fits your life.</Text><Text style={styles.heroSub}>Explore rental homes across Rwanda with clearer prices and safer listings.</Text>
         <View style={styles.searchBox}><Text style={styles.searchIcon}>⌕</Text><TextInput value={query} onChangeText={setQuery} placeholder="Search district, sector or property" placeholderTextColor="#8292A6" style={styles.searchInput} /></View>
       </View>
@@ -98,8 +100,9 @@ export default function App() {
         {filtered.map(item => <PropertyCard key={item.id} item={item} saved={saved.includes(item.id)} onSave={() => toggleSave(item.id)} onOpen={() => setSelected(item)} />)}
         {filtered.length === 0 && <View style={styles.empty}><Text style={styles.emptyTitle}>No properties found</Text><Text style={styles.description}>Try another district, sector or property type.</Text></View>}
       </View>
-    </ScrollView><View style={styles.tabBar}><Text style={styles.tabActive}>⌂  Explore</Text><Text style={styles.tab}>♡  Saved ({saved.length})</Text><Pressable onPress={() => { if (!user) setAuthVisible(true); else if (user.role === 'LANDLORD' || user.role === 'AGENT') setListingVisible(true); else Alert.alert('Landlord account required', 'Use a landlord or agent account to publish a property.'); }}><Text style={styles.tab}>＋  List a home</Text></Pressable><Pressable onPress={() => user ? onLogout() : setAuthVisible(true)}><Text style={styles.tab}>{user ? '↪ Sign out' : '☻ Profile'}</Text></Pressable></View></SafeAreaView>
+    </ScrollView><View style={styles.tabBar}><Text style={styles.tabActive}>⌂  Explore</Text><Text style={styles.tab}>♡  Saved ({saved.length})</Text><Pressable onPress={() => { if (!user) setAuthVisible(true); else if (user.role === 'LANDLORD' || user.role === 'AGENT') setListingVisible(true); else Alert.alert('Landlord account required', 'Use a landlord or agent account to publish a property.'); }}><Text style={styles.tab}>＋  List a home</Text></Pressable><Pressable onPress={() => user?.role === 'ADMIN' ? setAdminVisible(true) : user ? onLogout() : setAuthVisible(true)}><Text style={styles.tab}>{user?.role === 'ADMIN' ? 'Admin' : user ? '↪ Sign out' : '☻ Profile'}</Text></Pressable></View></SafeAreaView>
     {authVisible && <AuthScreen onAuthenticated={onAuthenticated} onClose={() => setAuthVisible(false)} />}
+    {adminVisible && <AdminDashboard onClose={() => setAdminVisible(false)} />}
     {listingVisible && <CreateListingForm onClose={() => setListingVisible(false)} onCreated={async () => { setListingVisible(false); Alert.alert('Listing submitted', 'Your property is pending platform review.'); try { const items = await getProperties(); if (items.length) setListingData(items.map(item => ({ id: item.id, title: item.title, district: item.district, sector: item.sector, rent: item.monthlyRentRwf, bedrooms: item.bedrooms, bathrooms: item.bathrooms, type: item.propertyType as Property['type'], image: item.images[0]?.url || properties[0].image, verified: Boolean(item.verifiedAt), available: item.available, furnished: item.furnished, description: item.description }))); } catch { /* Refresh can be retried when the feed reloads. */ } }} />}
     </>
   );

@@ -79,3 +79,22 @@ export async function createViewingRequest(input: { propertyId: string; preferre
 export async function getMyProperties(): Promise<ApiProperty[]> {
   return (await request<{ data: ApiProperty[] }>('/api/v1/marketplace/my-properties')).data;
 }
+
+export type AdminOverview = { users: number; properties: number; pendingListings: number; openReports: number; pendingViewings: number };
+export type AdminPendingProperty = ApiProperty & { status: string; owner: { id: string; fullName: string; phone: string; role: string; phoneVerifiedAt: string | null } };
+export type AdminReport = { id: string; reason: string; details: string | null; createdAt: string; property: { id: string; title: string; district: string; sector: string; status: string }; reporter: { id: string; fullName: string; phone: string } };
+export async function getAdminOverview(): Promise<AdminOverview> {
+  return (await request<{ data: AdminOverview }>('/api/v1/admin/overview')).data;
+}
+export async function getPendingProperties(): Promise<AdminPendingProperty[]> {
+  return (await request<{ data: AdminPendingProperty[] }>('/api/v1/admin/properties/pending')).data;
+}
+export async function reviewProperty(id: string, decision: 'PUBLISHED' | 'REJECTED', reason?: string) {
+  return request('/api/v1/admin/properties/' + encodeURIComponent(id) + '/review', { method: 'PATCH', body: JSON.stringify({ decision, ...(reason ? { reason } : {}) }) });
+}
+export async function getAdminReports(): Promise<AdminReport[]> {
+  return (await request<{ data: AdminReport[] }>('/api/v1/admin/reports')).data;
+}
+export async function resolveAdminReport(id: string) {
+  return request('/api/v1/admin/reports/' + encodeURIComponent(id), { method: 'PATCH', body: JSON.stringify({ resolved: true }) });
+}
