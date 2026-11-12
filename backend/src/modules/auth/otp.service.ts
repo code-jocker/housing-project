@@ -23,6 +23,9 @@ async function sendAfricaTalkingSms(phone: string, code: string) {
     signal: AbortSignal.timeout(10000),
   });
   if (!response.ok) throw new Error(`SMS provider rejected the request (HTTP ${response.status}).`);
+  const payload = await response.json().catch(() => null) as { SMSMessageData?: { Recipients?: { statusCode: number; status?: string }[] } } | null;
+  const recipients = payload?.SMSMessageData?.Recipients;
+  if (!recipients?.length || recipients.some(recipient => recipient.statusCode !== 101)) throw new Error('SMS provider did not accept the verification message for delivery.');
 }
 
 export async function createAndSendPhoneOtp(phone: string, purpose = 'PHONE_VERIFICATION') {
