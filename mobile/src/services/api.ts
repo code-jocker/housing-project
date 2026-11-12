@@ -141,3 +141,14 @@ export async function uploadPropertyImage(uri: string, mimeType?: string | null)
   if (!response.ok || typeof result.secure_url !== 'string') throw new Error(result.error?.message || 'Photo upload failed.');
   return result.secure_url;
 }
+
+export type AdminUser = { id: string; fullName: string; phone: string; email: string | null; role: 'TENANT' | 'LANDLORD' | 'AGENT' | 'ADMIN'; isActive: boolean; phoneVerifiedAt: string | null; createdAt: string };
+export async function getAdminUsers(): Promise<AdminUser[]> {
+  return (await request<{ data: AdminUser[] }>('/api/v1/admin/users?limit=100')).data;
+}
+export async function setAdminUserStatus(id: string, isActive: boolean) {
+  return request('/api/v1/admin/users/' + encodeURIComponent(id) + '/status', { method: 'PATCH', body: JSON.stringify({ isActive }) });
+}
+export async function setAdminUserRole(id: string, role: 'TENANT' | 'LANDLORD' | 'AGENT') {
+  return request('/api/v1/admin/users/' + encodeURIComponent(id) + '/role', { method: 'PATCH', body: JSON.stringify({ role }) });
+}
