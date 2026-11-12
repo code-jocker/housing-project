@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { AdminOverview, AdminPendingProperty, AdminReport, AdminUser, getAdminOverview, getAdminReports, getAdminUsers, getPendingProperties, resolveAdminReport, reviewProperty, setAdminUserRole, setAdminUserStatus } from '../services/api';
+import { AdminAuditLog, AdminOverview, AdminPendingProperty, AdminReport, AdminUser, getAdminAuditLogs, getAdminOverview, getAdminReports, getAdminUsers, getPendingProperties, resolveAdminReport, reviewProperty, setAdminUserRole, setAdminUserStatus } from '../services/api';
 
 type Props = { onClose: () => void };
 export function AdminDashboard({ onClose }: Props) {
@@ -8,14 +8,15 @@ export function AdminDashboard({ onClose }: Props) {
   const [pending,setPending]=useState<AdminPendingProperty[]>([]);
   const [reports,setReports]=useState<AdminReport[]>([]);
   const [users,setUsers]=useState<AdminUser[]>([]);
+  const [auditLogs,setAuditLogs]=useState<AdminAuditLog[]>([]);
   const [reasons,setReasons]=useState<Record<string,string>>({});
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState('');
   const refresh=useCallback(async()=>{
     setError('');
     try {
-      const [stats,listings,openReports,accounts]=await Promise.all([getAdminOverview(),getPendingProperties(),getAdminReports(),getAdminUsers()]);
-      setOverview(stats);setPending(listings);setReports(openReports);setUsers(accounts);
+      const [stats,listings,openReports,accounts,logs]=await Promise.all([getAdminOverview(),getPendingProperties(),getAdminReports(),getAdminUsers(),getAdminAuditLogs()]);
+      setOverview(stats);setPending(listings);setReports(openReports);setUsers(accounts);setAuditLogs(logs);
     } catch(e) { setError(e instanceof Error?e.message:'Could not load administrator data.'); }
   },[]);
   useEffect(()=>{void refresh();},[refresh]);
@@ -73,6 +74,8 @@ export function AdminDashboard({ onClose }: Props) {
           <View style={styles.roleButtons}>{(['TENANT','LANDLORD','AGENT'] as const).filter(role=>role!==account.role).map(role=><Pressable key={role} disabled={busy} onPress={()=>updateUserRole(account,role)} style={styles.roleButton}><Text style={styles.roleText}>Set {role.toLowerCase()}</Text></Pressable>)}</View>
         </>}
       </View>)}
+      <Text style={styles.section}>Recent audit activity ({auditLogs.length})</Text>
+      {auditLogs.map(log=><View key={log.id} style={styles.card}><Text style={styles.cardTitle}>{log.action.replaceAll('_',' ')}</Text><Text style={styles.meta}>{log.entityType} · {log.entityId}</Text><Text style={styles.owner}>Actor: {log.actorId}</Text>{!!log.details&&<Text style={styles.description}>{log.details}</Text>}<Text style={styles.meta}>{new Date(log.createdAt).toLocaleString()}</Text></View>)}
     </ScrollView>
   </View></View>;
 }

@@ -152,3 +152,8 @@ export async function setAdminUserStatus(id: string, isActive: boolean) {
 export async function setAdminUserRole(id: string, role: 'TENANT' | 'LANDLORD' | 'AGENT') {
   return request('/api/v1/admin/users/' + encodeURIComponent(id) + '/role', { method: 'PATCH', body: JSON.stringify({ role }) });
 }
+
+export type AdminAuditLog = { id: string; actorId: string; action: string; entityType: string; entityId: string; details: string | null; createdAt: string };
+export async function getAdminAuditLogs(): Promise<AdminAuditLog[]> {
+  return (await request<{ data: AdminAuditLog[] }>('/api/v1/admin/audit-logs?limit=30')).data;
+}
