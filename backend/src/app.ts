@@ -8,6 +8,7 @@ import { propertiesRouter } from './modules/properties/properties.routes.js';
 import { marketplaceRouter } from './modules/marketplace/marketplace.routes.js';
 import { adminRouter } from './modules/admin/admin.routes.js';
 import { notificationsRouter } from './modules/notifications/notifications.routes.js';
+import { uploadsRouter } from './modules/uploads/uploads.routes.js';
 import { healthRouter } from './modules/health/health.routes.js';
 
 export const app = express();
@@ -23,6 +24,7 @@ app.use('/api/v1/properties', propertiesRouter);
 app.use('/api/v1/marketplace', marketplaceRouter);
 app.use('/api/v1/admin', adminRouter);
 app.use('/api/v1/notifications', notificationsRouter);
+app.use('/api/v1/uploads', uploadsRouter);
 app.use((_req, res) => res.status(404).json({ message: 'Route not found.' }));
 app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   console.error(error);

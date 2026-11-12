@@ -12,6 +12,10 @@ const schema = z.object({
   AFRICASTALKING_API_KEY: z.string().optional(),
   AFRICASTALKING_SENDER_ID: z.string().optional(),
   OTP_DEBUG: z.enum(['true', 'false']).default('false').transform(value => value === 'true'),
+  CLOUDINARY_CLOUD_NAME: z.string().optional(),
+  CLOUDINARY_API_KEY: z.string().optional(),
+  CLOUDINARY_API_SECRET: z.string().optional(),
+  CLOUDINARY_UPLOAD_PRESET: z.string().optional(),
 });
 
 const parsed = schema.safeParse(process.env);

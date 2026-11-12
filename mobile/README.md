@@ -21,6 +21,7 @@ Expo + React Native + TypeScript application for Android and iOS.
 - Published property discovery, local search and property-type filters.
 - Saved properties synced with the API.
 - Property detail, viewing request and listing report.
+- Signed Cloudinary property-photo uploads from the phone's photo library.
 - Landlord workspace for submitted properties and viewing requests.
 - Tenant workspace for viewing request status and owner contact after acceptance.
 - Admin dashboard for moderation, reports and user management.

@@ -19,7 +19,13 @@
       }
     },
     "plugins": [
-      "expo-status-bar"
+      "expo-status-bar",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "HousingConnect uses photo access so landlords can add pictures of rental properties."
+        }
+      ]
     ]
   }
 }

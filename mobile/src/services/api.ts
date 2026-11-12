@@ -124,3 +124,20 @@ export async function markNotificationRead(id: string) {
 export async function markAllNotificationsRead() {
   return request('/api/v1/notifications/read-all', { method: 'PATCH' });
 }
+
+type PropertyUploadSignature = { cloudName: string; apiKey: string; timestamp: number; folder: string; uploadPreset: string; signature: string; uploadUrl: string };
+export async function uploadPropertyImage(uri: string, mimeType?: string | null): Promise<string> {
+  const signature = await request<PropertyUploadSignature>('/api/v1/uploads/property-image-signature', { method: 'POST' });
+  const form = new FormData();
+  const extension = mimeType?.split('/')[1] || 'jpg';
+  form.append('file', { uri, name: 'housingconnect-' + Date.now() + '.' + extension, type: mimeType || 'image/jpeg' } as unknown as Blob);
+  form.append('api_key', signature.apiKey);
+  form.append('timestamp', String(signature.timestamp));
+  form.append('folder', signature.folder);
+  form.append('upload_preset', signature.uploadPreset);
+  form.append('signature', signature.signature);
+  const response = await fetch(signature.uploadUrl, { method: 'POST', body: form });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok || typeof result.secure_url !== 'string') throw new Error(result.error?.message || 'Photo upload failed.');
+  return result.secure_url;
+}

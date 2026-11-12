@@ -4,6 +4,7 @@ import { PropertyStatus, UserRole } from '@prisma/client';
 import { prisma } from '../../config/prisma.js';
 import { authenticate, allowRoles } from '../../middleware/auth.js';
 import { asyncHandler } from '../../utils/async-handler.js';
+import { env } from '../../config/env.js';
 import { notifyAdminsSafely } from '../notifications/notifications.service.js';
 
 export const propertiesRouter = Router();
@@ -54,6 +55,18 @@ propertiesRouter.get('/:id', asyncHandler(async (req, res) => {
 propertiesRouter.post('/', authenticate, allowRoles(UserRole.LANDLORD, UserRole.AGENT, UserRole.ADMIN), asyncHandler(async (req, res) => {
   const parsed = propertySchema.safeParse(req.body);
   if (!parsed.success) { res.status(400).json({ message: 'Invalid property details.', errors: parsed.error.flatten() }); return; }
+  if (env.NODE_ENV === 'production') {
+    if (!env.CLOUDINARY_CLOUD_NAME || parsed.data.images.length === 0) {
+      res.status(400).json({ message: 'Upload at least one property photo before submitting a production listing.' }); return;
+    }
+    const invalidImage = parsed.data.images.some(value => {
+      try {
+        const imageUrl = new URL(value);
+        return imageUrl.protocol !== 'https:' || imageUrl.hostname !== 'res.cloudinary.com' || !imageUrl.pathname.startsWith(`/${env.CLOUDINARY_CLOUD_NAME}/image/upload/`);
+      } catch { return true; }
+    });
+    if (invalidImage) { res.status(400).json({ message: 'Production property photos must be uploaded to the configured private HousingConnect Cloudinary account.' }); return; }
+  }
   const { images, ...data } = parsed.data;
   const property = await prisma.property.create({ data: { ...data, ownerId: req.auth!.userId, status: PropertyStatus.PENDING_REVIEW, images: { create: images.map((url, sortOrder) => ({ url, sortOrder })) } }, include: { images: true } });
   await notifyAdminsSafely('LISTING_SUBMITTED', 'New listing submitted', `${property.title} is waiting for moderation.`);
