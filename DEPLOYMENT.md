@@ -33,7 +33,7 @@ Never place server credentials in Expo variables or commit them to Git.
 - Configure Cloudinary property image uploads: create a **signed** upload preset restricted to JPG/JPEG/PNG/WebP and a 10 MB maximum file size, then set `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` and `CLOUDINARY_UPLOAD_PRESET`. The API signs uploads; the mobile app never receives the API secret. Verify the preset restrictions in the Cloudinary console before launch.
 - Configure Firebase Cloud Messaging if push notifications are required. Current notifications are stored in the database and shown in-app only.
 - Add a map provider and validate Rwanda address/geocoding quality if map discovery is required.
-- Add password reset, account deletion, data export, retention and consent workflows.
+- Add account deletion, data export, retention and consent workflows. Password reset now uses a separate OTP purpose and revokes previously issued sessions.
 - Complete Rwanda data-protection/privacy, consumer-protection, terms-of-service and fraud-response review with qualified local counsel.
 - Configure production database backups, restore drills, uptime/error monitoring, log redaction, alerting and incident response.
 - Perform penetration testing, dependency/security scanning, load testing and Android real-device acceptance testing.

@@ -17,7 +17,7 @@ Expo + React Native + TypeScript application for Android and iOS.
 ## Implemented mobile workflows
 
 - Tenant and landlord registration/login with secure token storage.
-- Phone OTP verification screen.
+- Phone OTP verification and password-reset screens.
 - Published property discovery, local search and property-type filters.
 - Saved properties synced with the API.
 - Property detail, viewing request and listing report.
