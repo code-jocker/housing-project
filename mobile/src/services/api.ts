@@ -22,8 +22,22 @@ async function request<T>(path: string, options: RequestInit = {}, authenticated
   if (!response.ok) throw new Error(payload.message || `API request failed (${response.status}).`);
   return payload as T;
 }
-export async function getProperties(): Promise<ApiProperty[]> {
-  const response = await request<PropertyListResponse>('/api/v1/properties?limit=30', {}, false);
+export type PropertySearchFilters = {
+  q?: string;
+  type?: string;
+  verified?: boolean;
+  page?: number;
+  limit?: number;
+};
+
+export async function getProperties(filters: PropertySearchFilters = {}): Promise<ApiProperty[]> {
+  const params = new URLSearchParams();
+  params.set('limit', String(filters.limit ?? 30));
+  if (filters.q?.trim()) params.set('q', filters.q.trim());
+  if (filters.type) params.set('type', filters.type);
+  if (filters.verified) params.set('verified', 'true');
+  if (filters.page) params.set('page', String(filters.page));
+  const response = await request<PropertyListResponse>(`/api/v1/properties?${params.toString()}`, {}, false);
   return response.data;
 }
 export type RegisterInput = { fullName: string; phone: string; email?: string; password: string; role?: 'TENANT' | 'LANDLORD' };
