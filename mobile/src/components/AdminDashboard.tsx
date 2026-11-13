@@ -75,7 +75,7 @@ export function AdminDashboard({ onClose }: Props) {
     <ScrollView contentContainerStyle={{paddingBottom:30}}>
       {!!error&&<Text style={styles.error}>{error}</Text>}
       <View style={styles.actions}><Pressable onPress={refresh} style={styles.refresh}><Text style={styles.refreshText}>Refresh data</Text></Pressable></View>
-      {overview?<View style={styles.stats}>{[{label:'Users',value:overview.users},{label:'Listings',value:overview.properties},{label:'Pending review',value:overview.pendingListings},{label:'Open reports',value:overview.openReports},{label:'Viewing requests',value:overview.pendingViewings}].map(x=><View key={x.label} style={styles.stat}><Text style={styles.statValue}>{x.value}</Text><Text style={styles.statLabel}>{x.label}</Text></View>)}</View>:<ActivityIndicator color="#1976D2"/>}
+      {overview?<View style={styles.stats}>{[{label:'Users',value:overview.users},{label:'Listings',value:overview.properties},{label:'Pending review',value:overview.pendingListings},{label:'Open reports',value:overview.openReports},{label:'Viewing requests',value:overview.pendingViewings},{label:'Identity checks',value:overview.pendingIdentityVerifications},{label:'Property checks',value:overview.pendingPropertyVerifications}].map(x=><View key={x.label} style={styles.stat}><Text style={styles.statValue}>{x.value}</Text><Text style={styles.statLabel}>{x.label}</Text></View>)}</View>:<ActivityIndicator color="#1976D2"/>}
       <Text style={styles.section}>Listings awaiting review ({pending.length})</Text>
       {pending.length===0&&<Text style={styles.empty}>No pending listings.</Text>}
       {pending.map(item=><View key={item.id} style={styles.card}>
