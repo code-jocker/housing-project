@@ -30,8 +30,8 @@ propertiesRouter.get('/', asyncHandler(async (req, res) => {
   const querySchema = z.object({
     page: z.coerce.number().int().min(1).max(100000).default(1),
     limit: z.coerce.number().int().min(1).max(50).default(20),
-    minRent: z.coerce.number().int().min(0).optional(),
-    maxRent: z.coerce.number().int().min(0).optional(),
+    minRent: z.coerce.number().int().min(0).max(100000000).optional(),
+    maxRent: z.coerce.number().int().min(0).max(100000000).optional(),
     bedrooms: z.coerce.number().int().min(0).max(30).optional(),
     q: z.string().trim().min(2).max(100).optional(),
     district: z.string().trim().min(2).max(80).optional(),
