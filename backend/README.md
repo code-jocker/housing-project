@@ -44,7 +44,7 @@ Configure Cloudinary with a **signed upload preset**. Restrict the preset to JPG
 
 ## Private verification document storage
 
-Identity and property evidence must use a private S3-compatible bucket. Configure `PRIVATE_STORAGE_ENDPOINT`, `PRIVATE_STORAGE_REGION`, `PRIVATE_STORAGE_BUCKET`, `PRIVATE_STORAGE_ACCESS_KEY_ID` and `PRIVATE_STORAGE_SECRET_ACCESS_KEY`. Cloudflare R2 can be used with region `auto`. Keep public access disabled. The API creates short-lived signed upload URLs and administrator-only short-lived download URLs. Uploads accept PDF/JPEG/PNG; the API checks the stored object's size (maximum accepted size 10 MB) and media type before creating a verification case. An object uploaded but not submitted may remain orphaned; configure a bucket lifecycle rule for unreferenced temporary objects and a retention policy for submitted evidence.
+Identity and property evidence must use a private S3-compatible bucket. Configure `PRIVATE_STORAGE_ENDPOINT`, `PRIVATE_STORAGE_REGION`, `PRIVATE_STORAGE_BUCKET`, `PRIVATE_STORAGE_ACCESS_KEY_ID` and `PRIVATE_STORAGE_SECRET_ACCESS_KEY`. Cloudflare R2 can be used with region `auto`. Keep public access disabled. The API creates short-lived signed upload URLs and administrator-only short-lived download URLs. Uploads accept PDF/JPEG/PNG; before creating a verification case, the API checks the stored object's size (maximum accepted size 10 MB), declared media type and file signature (PDF/JPEG/PNG magic bytes), rather than trusting uploader-supplied MIME metadata alone. An object uploaded but not submitted may remain orphaned; configure a bucket lifecycle rule for unreferenced temporary objects and a retention policy for submitted evidence.
 
 ## First administrator account
 
