@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { AdminAuditLog, AdminOverview, AdminPendingProperty, AdminReport, AdminUser, getAdminAuditLogs, getAdminOverview, getAdminReports, getAdminUsers, getPendingProperties, resolveAdminReport, reviewProperty, setAdminUserRole, setAdminUserStatus } from '../services/api';
+import { ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { AdminAuditLog, AdminOverview, AdminPendingProperty, AdminReport, AdminUser, AdminIdentityVerification, AdminPropertyVerification, getAdminAuditLogs, getAdminOverview, getAdminReports, getAdminUsers, getPendingProperties, getAdminIdentityVerifications, getAdminPropertyVerifications, getAdminVerificationDocumentUrl, resolveAdminReport, reviewProperty, reviewIdentityVerification, reviewPropertyVerification, setAdminUserRole, setAdminUserStatus } from '../services/api';
 
 type Props = { onClose: () => void };
 export function AdminDashboard({ onClose }: Props) {
@@ -9,14 +9,16 @@ export function AdminDashboard({ onClose }: Props) {
   const [reports,setReports]=useState<AdminReport[]>([]);
   const [users,setUsers]=useState<AdminUser[]>([]);
   const [auditLogs,setAuditLogs]=useState<AdminAuditLog[]>([]);
+  const [identityChecks,setIdentityChecks]=useState<AdminIdentityVerification[]>([]);
+  const [propertyChecks,setPropertyChecks]=useState<AdminPropertyVerification[]>([]);
   const [reasons,setReasons]=useState<Record<string,string>>({});
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState('');
   const refresh=useCallback(async()=>{
     setError('');
     try {
-      const [stats,listings,openReports,accounts,logs]=await Promise.all([getAdminOverview(),getPendingProperties(),getAdminReports(),getAdminUsers(),getAdminAuditLogs()]);
-      setOverview(stats);setPending(listings);setReports(openReports);setUsers(accounts);setAuditLogs(logs);
+      const [stats,listings,openReports,accounts,logs,identity,propertyChecksResult]=await Promise.all([getAdminOverview(),getPendingProperties(),getAdminReports(),getAdminUsers(),getAdminAuditLogs(),getAdminIdentityVerifications(),getAdminPropertyVerifications()]);
+      setOverview(stats);setPending(listings);setReports(openReports);setUsers(accounts);setAuditLogs(logs);setIdentityChecks(identity);setPropertyChecks(propertyChecksResult);
     } catch(e) { setError(e instanceof Error?e.message:'Could not load administrator data.'); }
   },[]);
   useEffect(()=>{void refresh();},[refresh]);
@@ -40,6 +42,28 @@ export function AdminDashboard({ onClose }: Props) {
     catch(e) { setError(e instanceof Error?e.message:'Could not update user role.'); }
     finally { setBusy(false); }
   }
+  async function decideIdentity(item:AdminIdentityVerification,decision:'APPROVED'|'REJECTED') {
+    const reason=reasons[item.id]?.trim();
+    if(decision==='REJECTED'&&!reason){setError('Enter a rejection reason for identity documents.');return;}
+    setBusy(true);setError('');
+    try { await reviewIdentityVerification(item.id,decision,reason); await refresh(); }
+    catch(e){setError(e instanceof Error?e.message:'Identity review failed.');}
+    finally{setBusy(false);}
+  }
+  async function decideProperty(item:AdminPropertyVerification,decision:'APPROVED'|'REJECTED') {
+    const reason=reasons[item.id]?.trim();
+    if(decision==='REJECTED'&&!reason){setError('Enter a rejection reason for property documents.');return;}
+    setBusy(true);setError('');
+    try { await reviewPropertyVerification(item.id,decision,reason); await refresh(); }
+    catch(e){setError(e instanceof Error?e.message:'Property verification review failed.');}
+    finally{setBusy(false);}
+  }
+  async function openVerificationDocument(kind:'identity'|'property',id:string) {
+    setBusy(true);setError('');
+    try { const url=await getAdminVerificationDocumentUrl(kind,id); await Linking.openURL(url); }
+    catch(e){setError(e instanceof Error?e.message:'Could not open the private document.');}
+    finally{setBusy(false);}
+  }
   async function resolve(report:AdminReport) {
     setBusy(true);setError('');
     try { await resolveAdminReport(report.id); await refresh(); }
@@ -61,6 +85,25 @@ export function AdminDashboard({ onClose }: Props) {
         <Text style={styles.caution}>Platform moderation is not proof of ownership or authority to rent. Check the supporting documents through the approved verification process.</Text>
         <TextInput value={reasons[item.id]||''} onChangeText={value=>setReasons(current=>({...current,[item.id]:value}))} placeholder="Reason required if rejecting" style={styles.input}/>
         <View style={styles.buttons}><Pressable disabled={busy} onPress={()=>decide(item,'PUBLISHED')} style={styles.approve}><Text style={styles.buttonText}>Approve listing</Text></Pressable><Pressable disabled={busy} onPress={()=>decide(item,'REJECTED')} style={styles.reject}><Text style={styles.buttonText}>Reject</Text></Pressable></View>
+      </View>)}
+      <Text style={styles.section}>Identity verification queue ({identityChecks.length})</Text>
+      {identityChecks.length===0&&<Text style={styles.empty}>No pending identity submissions.</Text>}
+      {identityChecks.map(item=><View key={item.id} style={styles.card}>
+        <Text style={styles.cardTitle}>{item.user.fullName}</Text><Text style={styles.meta}>{item.user.phone} · {item.user.role} · {item.documentType.replaceAll('_',' ')}</Text>
+        <Text style={styles.owner}>Legal name: {item.legalName} · Document ending {item.documentLast4}</Text>
+        <Pressable disabled={busy} onPress={()=>openVerificationDocument('identity',item.id)} style={styles.resolve}><Text style={styles.resolveText}>Open private ID document</Text></Pressable>
+        <TextInput value={reasons[item.id]||''} onChangeText={value=>setReasons(current=>({...current,[item.id]:value}))} placeholder="Reason required if rejecting" style={styles.input}/>
+        <View style={styles.buttons}><Pressable disabled={busy} onPress={()=>decideIdentity(item,'APPROVED')} style={styles.approve}><Text style={styles.buttonText}>Approve identity</Text></Pressable><Pressable disabled={busy} onPress={()=>decideIdentity(item,'REJECTED')} style={styles.reject}><Text style={styles.buttonText}>Reject</Text></Pressable></View>
+      </View>)}
+      <Text style={styles.section}>Property authority verification ({propertyChecks.length})</Text>
+      {propertyChecks.length===0&&<Text style={styles.empty}>No pending property documents.</Text>}
+      {propertyChecks.map(item=><View key={item.id} style={styles.card}>
+        <Text style={styles.cardTitle}>{item.property.title}</Text><Text style={styles.meta}>{item.property.district}, {item.property.sector} · {item.documentType.replaceAll('_',' ')}</Text>
+        <Text style={styles.owner}>Submitted by {item.owner.fullName} · {item.owner.phone}</Text>
+        <Text style={styles.caution}>Approval requires the owner's identity verification to be approved first. Document review does not replace an in-person or independent check when risk is high.</Text>
+        <Pressable disabled={busy} onPress={()=>openVerificationDocument('property',item.id)} style={styles.resolve}><Text style={styles.resolveText}>Open private property document</Text></Pressable>
+        <TextInput value={reasons[item.id]||''} onChangeText={value=>setReasons(current=>({...current,[item.id]:value}))} placeholder="Reason required if rejecting" style={styles.input}/>
+        <View style={styles.buttons}><Pressable disabled={busy} onPress={()=>decideProperty(item,'APPROVED')} style={styles.approve}><Text style={styles.buttonText}>Verify property</Text></Pressable><Pressable disabled={busy} onPress={()=>decideProperty(item,'REJECTED')} style={styles.reject}><Text style={styles.buttonText}>Reject</Text></Pressable></View>
       </View>)}
       <Text style={styles.section}>Reported listings ({reports.length})</Text>
       {reports.length===0&&<Text style={styles.empty}>No unresolved reports.</Text>}
