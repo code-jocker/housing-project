@@ -6,7 +6,7 @@ Node.js, Express, TypeScript, Prisma and PostgreSQL API.
 
 1. Install Node.js 20.19.4 or newer and PostgreSQL 16.
 2. Copy `.env.example` to `.env`.
-3. Set `DATABASE_URL` and generate a unique `JWT_SECRET` of at least 32 characters.
+3. Set `DATABASE_URL` and generate a unique `JWT_SECRET` of at least 32 characters. For production, set `CLIENT_ORIGIN` to comma-separated HTTPS web origins; do not use `*`. Native mobile clients without an Origin header remain supported.
 4. Run `npm install`.
 5. Run `npx prisma generate`.
 6. Run `npx prisma migrate dev` to apply the committed migrations.
