@@ -15,13 +15,15 @@ adminRouter.use(authenticate, allowRoles(UserRole.ADMIN));
 const paginationSchema = z.object({ page: z.coerce.number().int().min(1).default(1), limit: z.coerce.number().int().min(1).max(100).optional() });
 
 adminRouter.get('/overview', asyncHandler(async (_req, res) => {
-  const [users, properties, pending, reports, openViewings] = await Promise.all([
+  const [users, properties, pending, reports, openViewings, pendingIdentity, pendingProperty] = await Promise.all([
     prisma.user.count(), prisma.property.count(),
     prisma.property.count({ where: { status: PropertyStatus.PENDING_REVIEW } }),
     prisma.propertyReport.count({ where: { resolved: false } }),
     prisma.viewingRequest.count({ where: { status: 'REQUESTED' } }),
+    prisma.userVerification.count({ where: { status: VerificationStatus.PENDING } }),
+    prisma.propertyVerification.count({ where: { status: VerificationStatus.PENDING } }),
   ]);
-  res.json({ data: { users, properties, pendingListings: pending, openReports: reports, pendingViewings: openViewings } });
+  res.json({ data: { users, properties, pendingListings: pending, openReports: reports, pendingViewings: openViewings, pendingIdentityVerifications: pendingIdentity, pendingPropertyVerifications: pendingProperty } });
 }));
 
 adminRouter.get('/properties/pending', asyncHandler(async (_req, res) => {
