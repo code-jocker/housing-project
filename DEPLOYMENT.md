@@ -21,7 +21,7 @@ The Render blueprint creates a paid managed database and a paid web service. It 
 - Managed PostgreSQL connection string
 - Africa's Talking production credentials and an approved sender ID
 - `OTP_DEBUG=false`
-- Restrictive `CLIENT_ORIGIN` if browser-based clients are added
+- `CLIENT_ORIGIN` must be an explicit comma-separated list of HTTPS browser origins in production (for example `https://housingconnect.example.com`). The Render Blueprint prompts for this value. Native iOS/Android requests without an `Origin` header remain supported.
 - HTTPS for all public API traffic
 
 Never place server credentials in Expo variables or commit them to Git.
