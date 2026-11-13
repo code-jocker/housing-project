@@ -167,7 +167,7 @@ export default function App() {
         <Text style={styles.sectionTitle}>About this property</Text><Text style={styles.description}>{selected.description}</Text>
         <Text style={styles.sectionTitle}>Listing status</Text><Text style={styles.description}>{selected.verified ? 'Identity/listing review badge shown in this demo. Confirm ownership or authority to rent separately.' : 'This listing has not yet been verified. Exercise caution before paying any money.'}</Text>
         <Pressable style={[styles.primaryButton,{backgroundColor:'#EAF3FC'}]} onPress={() => {
-          const location = selected.address || selected.cell || `${selected.sector}, ${selected.district}, Rwanda`;
+          const location = [selected.address, selected.cell, selected.sector, selected.district, 'Rwanda'].filter(Boolean).join(', ');
           void Linking.openURL('https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(location + ', Rwanda'));
         }}><Text style={[styles.primaryButtonText,{color:colors.blue}]}>View neighbourhood on map (approximate)</Text></Pressable>
         <Pressable style={styles.primaryButton} onPress={() => { if (!user) { setSelected(null); setAuthVisible(true); } else if (user.role !== 'TENANT') { Alert.alert('Tenant account required', 'Sign in with a tenant account to request a viewing.'); } else { setViewingVisible(true); } }}><Text style={styles.primaryButtonText}>Request a viewing</Text></Pressable>
