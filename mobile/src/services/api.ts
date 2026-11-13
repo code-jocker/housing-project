@@ -28,17 +28,34 @@ export type PropertySearchFilters = {
   verified?: boolean;
   page?: number;
   limit?: number;
+  district?: string;
+  sector?: string;
+  minRent?: number;
+  maxRent?: number;
+  bedrooms?: number;
+};
+export type PropertyPage = {
+  data: ApiProperty[];
+  pagination: { page: number; limit: number; total: number; pages: number };
 };
 
-export async function getProperties(filters: PropertySearchFilters = {}): Promise<ApiProperty[]> {
+export async function getPropertiesPage(filters: PropertySearchFilters = {}): Promise<PropertyPage> {
   const params = new URLSearchParams();
   params.set('limit', String(filters.limit ?? 30));
   if (filters.q?.trim()) params.set('q', filters.q.trim());
   if (filters.type) params.set('type', filters.type);
   if (filters.verified) params.set('verified', 'true');
   if (filters.page) params.set('page', String(filters.page));
-  const response = await request<PropertyListResponse>(`/api/v1/properties?${params.toString()}`, {}, false);
-  return response.data;
+  if (filters.district) params.set('district', filters.district);
+  if (filters.sector) params.set('sector', filters.sector);
+  if (filters.minRent !== undefined) params.set('minRent', String(filters.minRent));
+  if (filters.maxRent !== undefined) params.set('maxRent', String(filters.maxRent));
+  if (filters.bedrooms !== undefined) params.set('bedrooms', String(filters.bedrooms));
+  return request<PropertyPage>(`/api/v1/properties?${params.toString()}`, {}, false);
+}
+
+export async function getProperties(filters: PropertySearchFilters = {}): Promise<ApiProperty[]> {
+  return (await getPropertiesPage(filters)).data;
 }
 export type RegisterInput = { fullName: string; phone: string; email?: string; password: string; role?: 'TENANT' | 'LANDLORD' };
 type AuthResponse = { token: string; user: AuthUser };
