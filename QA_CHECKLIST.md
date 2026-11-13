@@ -30,6 +30,7 @@ Run this checklist against a staging database and real Android devices before ac
 - [ ] Open Verification centre and submit identity evidence.
 - [ ] Upload a property-authority document and confirm the ownership/authorization declaration.
 - [ ] Confirm PDF/JPEG/PNG files over 10 MB or unsupported file types are rejected at submission.
+- [ ] Upload a non-PDF file while declaring `application/pdf` (and repeat for JPEG/PNG); confirm signature validation rejects it.
 - [ ] Confirm only administrators can obtain short-lived private evidence download URLs.
 - [ ] Confirm document access is written to the audit log.
 - [ ] Confirm the admin cannot approve property verification until owner identity is approved.
