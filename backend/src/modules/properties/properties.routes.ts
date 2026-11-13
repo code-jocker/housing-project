@@ -54,6 +54,7 @@ propertiesRouter.get('/', asyncHandler(async (req, res) => {
   const where = {
     status: PropertyStatus.PUBLISHED,
     available: true,
+    owner: { isActive: true },
     ...(district ? { district: { equals: district, mode: 'insensitive' as const } } : {}),
     ...(sector ? { sector: { equals: sector, mode: 'insensitive' as const } } : {}),
     ...(type ? { propertyType: type } : {}),
@@ -80,7 +81,7 @@ propertiesRouter.get('/', asyncHandler(async (req, res) => {
 }));
 
 propertiesRouter.get('/:id', asyncHandler(async (req, res) => {
-  const property = await prisma.property.findFirst({ where: { id: req.params.id, status: PropertyStatus.PUBLISHED, available: true }, include: { images: { orderBy: { sortOrder: 'asc' } }, owner: { select: { id: true, fullName: true, role: true } } } });
+  const property = await prisma.property.findFirst({ where: { id: req.params.id, status: PropertyStatus.PUBLISHED, available: true, owner: { isActive: true } }, include: { images: { orderBy: { sortOrder: 'asc' } }, owner: { select: { id: true, fullName: true, role: true } } } });
   if (!property) { res.status(404).json({ message: 'Property not found.' }); return; }
   res.json({ data: property });
 }));
