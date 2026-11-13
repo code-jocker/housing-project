@@ -100,6 +100,50 @@ authRouter.post('/password-reset/confirm', asyncHandler(async (req, res) => {
   res.json({ message: 'Password reset successfully. Sign in using your new password.' });
 }));
 
+const accountDeletionRequestSchema = z.object({ phone: z.string().trim().regex(/^\+[1-9][0-9]{8,14}$/) });
+authRouter.post('/account-deletion/request', asyncHandler(async (req, res) => {
+  const parsed = accountDeletionRequestSchema.safeParse(req.body);
+  if (!parsed.success) { res.status(400).json({ message: 'Enter your phone number with country code.' }); return; }
+  const user = await prisma.user.findUnique({ where: { phone: parsed.data.phone }, select: { id: true, role: true } });
+  if (!user || user.role === UserRole.ADMIN) {
+    res.status(202).json({ message: 'If the account is eligible, a deletion code will be sent.' });
+    return;
+  }
+  try {
+    const result = await createAndSendPhoneOtp(parsed.data.phone, 'ACCOUNT_DELETION');
+    res.status(202).json({ message: 'If the account is eligible, a deletion code will be sent.', ...('waitSeconds' in result ? { waitSeconds: result.waitSeconds } : {}), ...('debugCode' in result ? { debugCode: result.debugCode } : {}) });
+  } catch {
+    res.status(503).json({ message: 'Account deletion verification is temporarily unavailable. Try again later.' });
+  }
+}));
+
+const accountDeletionConfirmSchema = z.object({
+  phone: z.string().trim().regex(/^\+[1-9][0-9]{8,14}$/),
+  code: z.string().regex(/^[0-9]{6}$/),
+});
+authRouter.post('/account-deletion/confirm', asyncHandler(async (req, res) => {
+  const parsed = accountDeletionConfirmSchema.safeParse(req.body);
+  if (!parsed.success) { res.status(400).json({ message: 'Enter a valid phone number and six-digit deletion code.' }); return; }
+  const { phone, code } = parsed.data;
+  const challenge = await prisma.phoneOtp.findUnique({ where: { phone } });
+  if (!challenge || challenge.purpose !== 'ACCOUNT_DELETION' || challenge.expiresAt <= new Date()) {
+    res.status(400).json({ message: 'The deletion code is invalid or expired. Request a new code.' }); return;
+  }
+  if (challenge.attempts >= 5) { res.status(429).json({ message: 'Too many incorrect attempts. Request a new code.' }); return; }
+  if (!verifyPhoneOtpHash(phone, code, challenge.codeHash, 'ACCOUNT_DELETION')) {
+    await prisma.phoneOtp.update({ where: { phone }, data: { attempts: { increment: 1 } } });
+    res.status(400).json({ message: 'Incorrect deletion code.' }); return;
+  }
+  const user = await prisma.user.findUnique({ where: { phone }, select: { id: true, role: true } });
+  if (!user || user.role === UserRole.ADMIN) { res.status(400).json({ message: 'This account cannot be deleted through self-service.' }); return; }
+  await prisma.$transaction([
+    prisma.auditLog.create({ data: { actorId: user.id, action: 'ACCOUNT_DELETED', entityType: 'User', entityId: user.id, details: 'Self-service deletion confirmed by phone OTP.' } }),
+    prisma.user.delete({ where: { id: user.id } }),
+    prisma.phoneOtp.delete({ where: { phone } }),
+  ]);
+  res.json({ message: 'Your account and associated marketplace records have been deleted.' });
+}));
+
 const otpRequestSchema = z.object({ phone: z.string().trim().regex(/^\+[1-9][0-9]{8,14}$/) });
 authRouter.post('/otp/request', asyncHandler(async (req, res) => {
   const parsed = otpRequestSchema.safeParse(req.body);
