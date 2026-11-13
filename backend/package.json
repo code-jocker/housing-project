@@ -10,7 +10,8 @@
     "prismaGenerate": "prisma generate",
     "prismaMigrate": "prisma migrate dev",
     "prismaStudio": "prisma studio",
-    "test": "tsx --test test/*.test.ts"
+    "test": "tsx --test test/*.test.ts",
+    "seed:admin": "tsx src/scripts/bootstrap-admin.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.19.0",
