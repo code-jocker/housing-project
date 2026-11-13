@@ -40,6 +40,18 @@ Never place server credentials in Expo variables or commit them to Git.
 - Perform penetration testing, dependency/security scanning, load testing and Android real-device acceptance testing.
 - Verify admin account bootstrap, role assignment and support procedures before opening registration.
 
+## One-time administrator bootstrap
+
+Before opening registration to the public:
+
+1. In the backend hosting environment, temporarily set `INITIAL_ADMIN_PHONE` (E.164, e.g. `+2507XXXXXXXX`), `INITIAL_ADMIN_NAME` and a unique `INITIAL_ADMIN_PASSWORD` of at least 12 characters.
+2. Open the backend service shell and run `npm run seed:admin` from the `backend` directory.
+3. Confirm the script reports the new ADMIN account. It refuses to elevate or overwrite an existing account.
+4. Remove all three `INITIAL_ADMIN_*` values from the hosting environment immediately after the one-time operation.
+5. Sign in with that administrator account and confirm access to the verification queues and audit records.
+
+Treat the bootstrap phone as verified only after confirming that you control the number through an independent process. Never place the bootstrap password in source control or a shared chat.
+
 ## Operational release checks
 
 - Confirm all CI jobs are green on the exact release commit.
