@@ -15,7 +15,11 @@ import { verificationRouter } from './modules/verification/verification.routes.j
 export const app = express();
 app.disable('x-powered-by');
 app.use(helmet());
-app.use(cors({ origin: env.CLIENT_ORIGIN === '*' ? true : env.CLIENT_ORIGIN.split(',').map(value => value.trim()) }));
+const allowedOrigins = env.CLIENT_ORIGIN.split(',').map(value => value.trim()).filter(Boolean);
+app.use(cors({
+  // Native mobile clients normally omit Origin; browser clients must match the allowlist.
+  origin: (origin, callback) => callback(null, !origin || allowedOrigins.includes(origin)),
+}));
 app.use(express.json({ limit: '1mb' }));
 app.use(rateLimit({ windowMs: 15 * 60 * 1000, limit: 200, standardHeaders: 'draft-8', legacyHeaders: false }));
 app.get('/', (_req, res) => res.json({ name: 'HousingConnect API', version: '1.0.0', docs: 'See README.md for endpoints.' }));
