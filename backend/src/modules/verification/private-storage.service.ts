@@ -69,13 +69,38 @@ export function createVerificationDownloadUrl(objectKey: string) {
 }
 
 export async function inspectVerificationObject(objectKey: string) {
-  const url = presign('HEAD', objectKey, 60);
-  const response = await fetch(url, { method: 'HEAD' });
-  if (!response.ok) return null;
-  const size = Number(response.headers.get('content-length') || 0);
-  const contentType = response.headers.get('content-type') || '';
-  if (!Number.isFinite(size) || size <= 0 || size > 10 * 1024 * 1024) return null;
-  if (!['application/pdf', 'image/jpeg', 'image/png'].includes(contentType.toLowerCase())) return null;
+  const headUrl = presign('HEAD', objectKey, 60);
+  const head = await fetch(headUrl, { method: 'HEAD', signal: AbortSignal.timeout(10_000) });
+  if (!head.ok) return null;
+
+  const size = Number(head.headers.get('content-length') || 0);
+  const contentType = (head.headers.get('content-type') || '').split(';')[0].trim().toLowerCase();
+  const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png'];
+  if (!Number.isSafeInteger(size) || size <= 0 || size > 10 * 1024 * 1024) return null;
+  if (!allowedTypes.includes(contentType)) return null;
+
+  // Object metadata is supplied by the uploader and is not proof of file format.
+  // Read only the first eight bytes and verify the actual file signature.
+  const getUrl = presign('GET', objectKey, 60);
+  const sample = await fetch(getUrl, {
+    method: 'GET',
+    headers: { Range: 'bytes=0-7' },
+    signal: AbortSignal.timeout(10_000),
+  });
+  if (sample.status !== 206 && !(sample.status === 200 && size <= 8)) return null;
+  const bytes = new Uint8Array(await sample.arrayBuffer());
+  const isPdf = contentType === 'application/pdf'
+    && bytes.length >= 5
+    && bytes[0] === 0x25 && bytes[1] === 0x50 && bytes[2] === 0x44 && bytes[3] === 0x46 && bytes[4] === 0x2d;
+  const isJpeg = contentType === 'image/jpeg'
+    && bytes.length >= 3
+    && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
+  const pngSignature = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+  const isPng = contentType === 'image/png'
+    && bytes.length >= pngSignature.length
+    && pngSignature.every((value, index) => bytes[index] === value);
+
+  if (!isPdf && !isJpeg && !isPng) return null;
   return { size, contentType };
 }
 
