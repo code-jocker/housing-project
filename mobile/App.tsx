@@ -84,6 +84,7 @@ export default function App() {
           (bedroomsValue !== undefined && (!Number.isInteger(bedroomsValue) || bedroomsValue < 0 || bedroomsValue > 30)) ||
           (minRentValue !== undefined && maxRentValue !== undefined && minRentValue > maxRentValue)) {
         setListingData([]);
+        setTotalPages(1);
         setApiMessage('Enter valid whole-number rent limits and a bedroom count from 0 to 30.');
         setLoadingListings(false);
         return;
@@ -122,7 +123,7 @@ export default function App() {
     const matchesRent = (minRentValue === undefined || p.rent >= minRentValue) && (maxRentValue === undefined || p.rent <= maxRentValue);
     const matchesBedrooms = bedroomsValue === undefined || p.bedrooms >= bedroomsValue;
     return matchesQuery && matchesFilter && matchesRent && matchesBedrooms && p.available && (!showSaved || saved.includes(p.id));
-  }), [listingData, query, filter, showSaved, saved]);
+  }), [listingData, query, filter, showSaved, saved, minRentText, maxRentText, bedroomsText]);
   const toggleSave = async (id: string) => {
     if (!user) { setAuthVisible(true); return; }
     const alreadySaved = saved.includes(id);
