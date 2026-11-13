@@ -1,4 +1,4 @@
-import { createHmac } from 'node:crypto';
+import { createHash, createHmac } from 'node:crypto';
 import { env } from '../../config/env.js';
 
 type StorageMethod = 'PUT' | 'GET' | 'HEAD';
@@ -51,7 +51,7 @@ function presign(method: StorageMethod, objectKey: string, expiresSeconds: numbe
   const canonicalHeaders = contentType ? `content-type:${contentType}\nhost:${host}\n` : `host:${host}\n`;
   const signedHeaders = contentType ? 'content-type;host' : 'host';
   const canonicalRequest = [method, canonicalUri, canonicalQuery, canonicalHeaders, signedHeaders, 'UNSIGNED-PAYLOAD'].join('\n');
-  const stringToSign = ['AWS4-HMAC-SHA256', amzDate, scope, createHmac('sha256', 'utf8').update(canonicalRequest).digest('hex')].join('\n');
+  const stringToSign = ['AWS4-HMAC-SHA256', amzDate, scope, createHash('sha256').update(canonicalRequest).digest('hex')].join('\n');
   const kDate = hmac('AWS4' + config.secretAccessKey, dateStamp);
   const kRegion = hmac(kDate, config.region);
   const kService = hmac(kRegion, 's3');
