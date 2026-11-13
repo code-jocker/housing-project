@@ -195,3 +195,56 @@ export async function requestPasswordReset(phone: string): Promise<{ message: st
 export async function confirmPasswordReset(phone: string, code: string, newPassword: string): Promise<void> {
   await request('/api/v1/auth/password-reset/confirm', { method: 'POST', body: JSON.stringify({ phone, code, newPassword }) }, false);
 }
+
+
+export type VerificationState = 'PENDING' | 'APPROVED' | 'REJECTED';
+export type MyVerification = {
+  identity: { id: string; legalName: string; documentType: string; documentLast4: string; status: VerificationState; rejectionReason: string | null; submittedAt: string; reviewedAt: string | null } | null;
+  properties: { id: string; property: { id: string; title: string; district: string; sector: string }; documentType: string; status: VerificationState; rejectionReason: string | null; submittedAt: string; reviewedAt: string | null }[];
+};
+export async function getMyVerification(): Promise<MyVerification> {
+  return request<MyVerification>('/api/v1/verification/me');
+}
+export async function uploadVerificationDocument(uri: string, contentType: 'application/pdf' | 'image/jpeg' | 'image/png', purpose: 'IDENTITY' | 'PROPERTY'): Promise<string> {
+  const signature = await request<{ uploadUrl: string; objectKey: string; requiredHeaders: Record<string, string> }>('/api/v1/verification/documents/upload-url', {
+    method: 'POST',
+    body: JSON.stringify({ purpose, contentType }),
+  });
+  const fileResponse = await fetch(uri);
+  if (!fileResponse.ok) throw new Error('Could not read the selected document.');
+  const blob = await fileResponse.blob();
+  if (blob.size > 10 * 1024 * 1024) throw new Error('Verification documents must be 10 MB or smaller.');
+  const uploaded = await fetch(signature.uploadUrl, { method: 'PUT', headers: signature.requiredHeaders, body: blob });
+  if (!uploaded.ok) throw new Error('Secure document upload failed. Try again.');
+  return signature.objectKey;
+}
+export async function submitIdentityVerification(input: { legalName: string; documentType: 'NATIONAL_ID' | 'PASSPORT' | 'RESIDENCE_PERMIT'; documentLast4: string; evidenceObjectKey: string }) {
+  return request('/api/v1/verification/identity', { method: 'POST', body: JSON.stringify(input) });
+}
+export async function submitPropertyVerification(propertyId: string, input: { documentType: 'LAND_TITLE' | 'LEASE_AUTHORIZATION' | 'OWNER_CONSENT' | 'AGENT_MANDATE'; authorizationConfirmed: true; evidenceObjectKey: string }) {
+  return request('/api/v1/verification/properties/' + encodeURIComponent(propertyId), { method: 'POST', body: JSON.stringify(input) });
+}
+export type AdminIdentityVerification = {
+  id: string; legalName: string; documentType: string; documentLast4: string; status: VerificationState; submittedAt: string;
+  user: { id: string; fullName: string; phone: string; email: string | null; phoneVerifiedAt: string | null; role: string };
+};
+export type AdminPropertyVerification = {
+  id: string; documentType: string; authorizationConfirmed: boolean; status: VerificationState; submittedAt: string;
+  owner: { id: string; fullName: string; phone: string; role: string };
+  property: { id: string; title: string; district: string; sector: string; monthlyRentRwf: number; status: string };
+};
+export async function getAdminIdentityVerifications(): Promise<AdminIdentityVerification[]> {
+  return (await request<{ data: AdminIdentityVerification[] }>('/api/v1/admin/verifications/identity')).data;
+}
+export async function getAdminPropertyVerifications(): Promise<AdminPropertyVerification[]> {
+  return (await request<{ data: AdminPropertyVerification[] }>('/api/v1/admin/verifications/properties')).data;
+}
+export async function getAdminVerificationDocumentUrl(kind: 'identity' | 'property', id: string): Promise<string> {
+  return (await request<{ url: string }>('/api/v1/admin/verifications/' + kind + '/' + encodeURIComponent(id) + '/document')).url;
+}
+export async function reviewIdentityVerification(id: string, decision: 'APPROVED' | 'REJECTED', reason?: string) {
+  return request('/api/v1/admin/verifications/identity/' + encodeURIComponent(id), { method: 'PATCH', body: JSON.stringify({ decision, ...(reason ? { reason } : {}) }) });
+}
+export async function reviewPropertyVerification(id: string, decision: 'APPROVED' | 'REJECTED', reason?: string) {
+  return request('/api/v1/admin/verifications/properties/' + encodeURIComponent(id), { method: 'PATCH', body: JSON.stringify({ decision, ...(reason ? { reason } : {}) }) });
+}
