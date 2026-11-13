@@ -21,6 +21,9 @@ const schema = z.object({
   PRIVATE_STORAGE_BUCKET: z.string().optional(),
   PRIVATE_STORAGE_ACCESS_KEY_ID: z.string().optional(),
   PRIVATE_STORAGE_SECRET_ACCESS_KEY: z.string().optional(),
+  INITIAL_ADMIN_PHONE: z.string().optional(),
+  INITIAL_ADMIN_NAME: z.string().optional(),
+  INITIAL_ADMIN_PASSWORD: z.string().optional(),
 });
 
 const parsed = schema.safeParse(process.env);
