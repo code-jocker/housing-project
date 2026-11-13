@@ -51,11 +51,19 @@ verificationRouter.post('/identity', asyncHandler(async (req, res) => {
   if (!isPrivateStorageConfigured()) { res.status(503).json({ message: 'Private document storage is not configured.' }); return; }
   const object = await inspectVerificationObject(parsed.data.evidenceObjectKey);
   if (!object) { res.status(400).json({ message: 'The uploaded document is missing, too large or has an unsupported file type. Maximum size is 10 MB.' }); return; }
-  const data = await prisma.userVerification.upsert({
-    where: { userId: req.auth!.userId },
-    create: { userId: req.auth!.userId, ...parsed.data, status: VerificationStatus.PENDING },
-    update: { ...parsed.data, status: VerificationStatus.PENDING, rejectionReason: null, submittedAt: new Date(), reviewedAt: null, reviewedById: null },
-    select: { id: true, status: true, submittedAt: true },
+  const data = await prisma.$transaction(async tx => {
+    const verification = await tx.userVerification.upsert({
+      where: { userId: req.auth!.userId },
+      create: { userId: req.auth!.userId, ...parsed.data, status: VerificationStatus.PENDING },
+      update: { ...parsed.data, status: VerificationStatus.PENDING, rejectionReason: null, submittedAt: new Date(), reviewedAt: null, reviewedById: null },
+      select: { id: true, status: true, submittedAt: true },
+    });
+    await tx.property.updateMany({ where: { ownerId: req.auth!.userId }, data: { verifiedAt: null } });
+    await tx.propertyVerification.updateMany({
+      where: { ownerId: req.auth!.userId, status: VerificationStatus.APPROVED },
+      data: { status: VerificationStatus.PENDING, rejectionReason: null, reviewedAt: null, reviewedById: null, submittedAt: new Date() },
+    });
+    return verification;
   });
   await recordAuditLogSafely(req.auth!.userId, 'IDENTITY_VERIFICATION_SUBMITTED', 'UserVerification', data.id);
   await notifyAdminsSafely('IDENTITY_VERIFICATION_SUBMITTED', 'Identity verification submitted', 'A landlord or agent submitted identity documents for review.');
