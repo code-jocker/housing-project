@@ -60,7 +60,7 @@ The script refuses to elevate or overwrite an existing account. Confirm control 
 
 - `npm run build`: TypeScript production build.
 - `npm test`: API integration test against PostgreSQL.
-- CI runs Prisma validation, migrations, backend build, API integration tests and mobile TypeScript checks.
+- CI runs Prisma validation, migrations, backend build, API integration tests, mobile TypeScript checks and an Android Expo production bundle export.
 - Use `npx prisma migrate deploy` for production releases.
 - See repository-level `DEPLOYMENT.md` and `render.yaml` for the optional Render Blueprint.
 
