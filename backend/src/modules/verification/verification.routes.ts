@@ -73,7 +73,7 @@ verificationRouter.post('/properties/:propertyId', asyncHandler(async (req, res)
   if (!parsed.success) { res.status(400).json({ message: 'Confirm that you own the property or are authorized to rent it, and select a supporting document.' }); return; }
   const property = await prisma.property.findUnique({ where: { id: req.params.propertyId }, select: { id: true, ownerId: true, title: true } });
   if (!property) { res.status(404).json({ message: 'Property not found.' }); return; }
-  if (property.ownerId !== req.auth!.userId && req.auth!.role !== UserRole.ADMIN) { res.status(403).json({ message: 'Only the listing owner can submit property verification.' }); return; }
+  if (property.ownerId !== req.auth!.userId) { res.status(403).json({ message: 'Only the listing owner can submit property verification.' }); return; }
   const prefix = `verification/${req.auth!.userId}/property/`;
   if (!parsed.data.evidenceObjectKey.startsWith(prefix)) { res.status(400).json({ message: 'The uploaded document does not belong to your account.' }); return; }
   if (!isPrivateStorageConfigured()) { res.status(503).json({ message: 'Private document storage is not configured.' }); return; }
