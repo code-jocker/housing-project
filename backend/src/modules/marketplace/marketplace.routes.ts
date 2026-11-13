@@ -76,9 +76,13 @@ marketplaceRouter.get('/viewings', asyncHandler(async (req, res) => {
     },
     orderBy: { createdAt: 'desc' },
   });
-  const safeData = data.map(item => req.auth!.role === UserRole.TENANT && item.status !== ViewingStatus.ACCEPTED
-    ? { ...item, property: { ...item.property, owner: { ...item.property.owner, phone: '' } } }
-    : item);
+  const safeData = data.map(item => {
+    if (req.auth!.role === UserRole.ADMIN || [ViewingStatus.ACCEPTED, ViewingStatus.COMPLETED].includes(item.status)) return item;
+    if (req.auth!.role === UserRole.TENANT) {
+      return { ...item, property: { ...item.property, owner: { ...item.property.owner, phone: '' } } };
+    }
+    return { ...item, tenant: { ...item.tenant, phone: '' } };
+  });
   res.json({ data: safeData });
 }));
 
