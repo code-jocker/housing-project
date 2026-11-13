@@ -10,7 +10,7 @@ import { recordAuditLogSafely } from '../audit/audit.service.js';
 import { createVerificationUploadUrl, inspectVerificationObject, isPrivateStorageConfigured } from './private-storage.service.js';
 
 export const verificationRouter = Router();
-verificationRouter.use(authenticate, allowRoles(UserRole.LANDLORD, UserRole.AGENT, UserRole.ADMIN));
+verificationRouter.use(authenticate, allowRoles(UserRole.LANDLORD, UserRole.AGENT));
 
 const allowedContentTypes = ['application/pdf', 'image/jpeg', 'image/png'] as const;
 const uploadSchema = z.object({
