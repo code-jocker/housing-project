@@ -12,7 +12,7 @@ import { createVerificationDownloadUrl, isPrivateStorageConfigured } from '../ve
 export const adminRouter = Router();
 adminRouter.use(authenticate, allowRoles(UserRole.ADMIN));
 
-const paginationSchema = z.object({ page: z.coerce.number().int().min(1).default(1), limit: z.coerce.number().int().min(1).max(100).optional() });
+const paginationSchema = z.object({ page: z.coerce.number().int().min(1).max(100000).default(1), limit: z.coerce.number().int().min(1).max(100).optional() });
 
 adminRouter.get('/overview', asyncHandler(async (_req, res) => {
   const [users, properties, pending, reports, openViewings, pendingIdentity, pendingProperty] = await Promise.all([
