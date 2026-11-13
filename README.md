@@ -46,3 +46,4 @@ Demo properties are fictional. Use `EXPO_PUBLIC_DEMO_MODE=true` only for local d
 - [Backend setup and API](backend/README.md)
 - [Mobile development and Android builds](mobile/README.md)
 - [Deployment and release checklist](DEPLOYMENT.md)
+- [Staging and production QA checklist](QA_CHECKLIST.md)
