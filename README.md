@@ -18,6 +18,8 @@ A mobile-first rental marketplace connecting tenants with landlords and authoriz
 - Landlord property submission, photo upload and listing status management
 - Tenant viewing requests, landlord responses and owner contact after acceptance
 - Listing reports, admin moderation, account activation/role management
+- Private identity-document and property-authority verification submissions using short-lived S3-compatible upload/download URLs
+- Administrator identity and property evidence queues; a property receives a verified badge only after both owner identity and property-authority checks are approved
 - In-app notifications for viewing, report and listing-review events
 - Application audit trail for important property, viewing and administrator actions
 - PostgreSQL migrations and automated API integration tests
