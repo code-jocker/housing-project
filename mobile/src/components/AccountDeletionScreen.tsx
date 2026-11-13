@@ -45,7 +45,7 @@ export function AccountDeletionScreen({ phone, onClose, onDeleted }: Props) {
   }
 
   return <View style={styles.overlay}><View style={styles.panel}>
-    <View style={styles.header}><Text style={styles.title}>Account deletion</Text><Pressable onPress={onClose}><Text style={styles.close}>✕</Text></Pressable></View>
+    <View style={styles.header}><Text style={styles.title}>Account & privacy settings</Text><Pressable onPress={onClose}><Text style={styles.close}>✕</Text></Pressable></View>
     <Text style={styles.warning}>This is permanent. Your marketplace profile, listings, favorites, viewing requests, notifications and private verification documents will be removed. Audit records required for platform security may be retained without your account profile.</Text>
     <Text style={styles.phone}>Phone: {phone}</Text>
     <Pressable disabled={busy} onPress={exportData} style={styles.secondary}><Text style={styles.secondaryText}>Export a copy of my data</Text></Pressable>
@@ -53,7 +53,7 @@ export function AccountDeletionScreen({ phone, onClose, onDeleted }: Props) {
     {!!message && <Text style={styles.message}>{message}</Text>}
     {!!debugCode && <Text style={styles.debug}>Development OTP: {debugCode}</Text>}
     <TextInput value={code} onChangeText={value => setCode(value.replace(/[^0-9]/g, '').slice(0, 6))} keyboardType="number-pad" maxLength={6} placeholder="6-digit confirmation code" style={styles.input}/>
-    <Pressable disabled={busy} onPress={confirm} style={styles.danger}><Text style={styles.dangerText}>Confirm permanent deletion</Text></Pressable>
+    <Pressable disabled={busy} onPress={confirm} style={styles.danger}><Text style={styles.dangerText}>Request permanent account deletion</Text></Pressable>
     {busy && <ActivityIndicator style={{ marginTop: 15 }} color="#C53030"/>}
   </View></View>;
 }
