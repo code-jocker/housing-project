@@ -14,6 +14,7 @@ A mobile-first rental marketplace connecting tenants with landlords and authoriz
 - Public published-property discovery, search and property details
 - Tenant and landlord registration/login with secure token storage
 - Phone OTP verification and password reset; password reset revokes old access tokens
+- Phone-OTP-confirmed self-service account deletion, including associated marketplace records and private verification evidence
 - Saved properties synced with the API
 - Landlord property submission, photo upload and listing status management
 - Tenant viewing requests, landlord responses and owner contact after acceptance
