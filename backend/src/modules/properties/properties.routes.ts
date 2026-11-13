@@ -114,7 +114,17 @@ propertiesRouter.patch('/:id', authenticate, allowRoles(UserRole.LANDLORD, UserR
   const parsed = propertySchema.partial().safeParse(req.body);
   if (!parsed.success) { res.status(400).json({ message: 'Invalid property details.', errors: parsed.error.flatten() }); return; }
   const { images, ...data } = parsed.data;
-  const updated = await prisma.property.update({ where: { id: current.id }, data: { ...data, status: req.auth!.role === UserRole.ADMIN ? current.status : PropertyStatus.PENDING_REVIEW, ...(req.auth!.role === UserRole.ADMIN ? {} : { verifiedAt: null }), ...(images ? { images: { deleteMany: {}, create: images.map((url, sortOrder) => ({ url, sortOrder })) } } : {}) }, include: { images: true } });
+  const updated = await prisma.$transaction(async tx => {
+    const result = await tx.property.update({
+      where: { id: current.id },
+      data: { ...data, status: req.auth!.role === UserRole.ADMIN ? current.status : PropertyStatus.PENDING_REVIEW, ...(req.auth!.role === UserRole.ADMIN ? {} : { verifiedAt: null }), ...(images ? { images: { deleteMany: {}, create: images.map((url, sortOrder) => ({ url, sortOrder })) } } : {}) },
+      include: { images: true },
+    });
+    if (req.auth!.role !== UserRole.ADMIN) {
+      await tx.propertyVerification.deleteMany({ where: { propertyId: current.id } });
+    }
+    return result;
+  });
   await recordAuditLogSafely(req.auth!.userId, 'PROPERTY_UPDATED', 'Property', current.id);
   res.json({ message: 'Property updated. Changes are pending review.', data: updated });
 }));
