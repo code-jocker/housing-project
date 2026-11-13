@@ -230,7 +230,7 @@ export type AdminIdentityVerification = {
 };
 export type AdminPropertyVerification = {
   id: string; documentType: string; authorizationConfirmed: boolean; status: VerificationState; submittedAt: string;
-  owner: { id: string; fullName: string; phone: string; role: string };
+  owner: { id: string; fullName: string; phone: string; role: string; identityVerification: { status: VerificationState } | null };
   property: { id: string; title: string; district: string; sector: string; monthlyRentRwf: number; status: string };
 };
 export async function getAdminIdentityVerifications(): Promise<AdminIdentityVerification[]> {
