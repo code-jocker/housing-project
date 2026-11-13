@@ -256,3 +256,8 @@ export async function requestAccountDeletion(phone: string): Promise<{ message: 
 export async function confirmAccountDeletion(phone: string, code: string): Promise<void> {
   await request('/api/v1/auth/account-deletion/confirm', { method: 'POST', body: JSON.stringify({ phone, code }) }, false);
 }
+
+
+export async function getAccountExport(): Promise<Record<string, unknown>> {
+  return request<Record<string, unknown>>('/api/v1/auth/account/export');
+}
