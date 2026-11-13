@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import { confirmAccountDeletion, requestAccountDeletion } from '../services/api';
+import { ActivityIndicator, Alert, Pressable, Share, StyleSheet, Text, TextInput, View } from 'react-native';
+import { confirmAccountDeletion, getAccountExport, requestAccountDeletion } from '../services/api';
 
 type Props = { phone: string; onClose: () => void; onDeleted: () => void };
 export function AccountDeletionScreen({ phone, onClose, onDeleted }: Props) {
@@ -8,6 +8,15 @@ export function AccountDeletionScreen({ phone, onClose, onDeleted }: Props) {
   const [debugCode, setDebugCode] = useState('');
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
+
+  async function exportData() {
+    setBusy(true); setMessage('');
+    try {
+      const data = await getAccountExport();
+      await Share.share({ title: 'HousingConnect personal data export', message: JSON.stringify(data, null, 2) });
+    } catch (error) { setMessage(error instanceof Error ? error.message : 'Could not prepare your data export.'); }
+    finally { setBusy(false); }
+  }
 
   async function requestCode() {
     setBusy(true); setMessage('');
@@ -39,6 +48,7 @@ export function AccountDeletionScreen({ phone, onClose, onDeleted }: Props) {
     <View style={styles.header}><Text style={styles.title}>Account deletion</Text><Pressable onPress={onClose}><Text style={styles.close}>✕</Text></Pressable></View>
     <Text style={styles.warning}>This is permanent. Your marketplace profile, listings, favorites, viewing requests, notifications and private verification documents will be removed. Audit records required for platform security may be retained without your account profile.</Text>
     <Text style={styles.phone}>Phone: {phone}</Text>
+    <Pressable disabled={busy} onPress={exportData} style={styles.secondary}><Text style={styles.secondaryText}>Export a copy of my data</Text></Pressable>
     <Pressable disabled={busy} onPress={requestCode} style={styles.secondary}><Text style={styles.secondaryText}>Send deletion confirmation code</Text></Pressable>
     {!!message && <Text style={styles.message}>{message}</Text>}
     {!!debugCode && <Text style={styles.debug}>Development OTP: {debugCode}</Text>}
