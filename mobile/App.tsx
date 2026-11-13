@@ -55,21 +55,32 @@ export default function App() {
   useEffect(() => { getSession().then(async session => { setUser(session); if (session) { try { const items = await getFavorites(); setSaved(items.map(item => item.id)); } catch { /* Saved-list loading can be retried later. */ } } }); }, []);
   useEffect(() => {
     let active = true;
-    getProperties().then(items => {
-      if (!active) return;
-      if (items.length > 0) setListingData(items.map(item => ({ id: item.id, title: item.title, district: item.district, sector: item.sector, rent: item.monthlyRentRwf, bedrooms: item.bedrooms, bathrooms: item.bathrooms, type: item.propertyType as Property['type'], image: item.images[0]?.url || properties[0].image, verified: Boolean(item.verifiedAt), available: item.available, furnished: item.furnished, description: item.description })));
-      else setListingData(demoMode ? properties : []);
-      setApiMessage(items.length ? 'Live listings' : demoMode ? 'Demo listings — not real rental offers.' : 'No published properties are available yet.');
-    }).catch(() => { if (active) { setListingData(demoMode ? properties : []); setApiMessage(demoMode ? 'API unavailable — demo listings only, not real offers.' : 'Unable to connect to listings. Check your connection and try again.'); } })
-      .finally(() => { if (active) setLoadingListings(false); });
-    return () => { active = false; };
-  }, []);
+    const timer = setTimeout(() => {
+      setLoadingListings(true);
+      getProperties({
+        q: query.trim().length >= 2 ? query.trim() : undefined,
+        type: filter !== 'All' && filter !== 'Verified' ? filter : undefined,
+        verified: filter === 'Verified',
+      }).then(items => {
+        if (!active) return;
+        if (items.length > 0) setListingData(items.map(item => ({ id: item.id, title: item.title, district: item.district, sector: item.sector, rent: item.monthlyRentRwf, bedrooms: item.bedrooms, bathrooms: item.bathrooms, type: item.propertyType as Property['type'], image: item.images[0]?.url || properties[0].image, verified: Boolean(item.verifiedAt), available: item.available, furnished: item.furnished, description: item.description })));
+        else setListingData(demoMode ? properties : []);
+        setApiMessage(items.length ? 'Live listings' : demoMode ? 'Demo listings — not real rental offers.' : 'No published properties match these filters.');
+      }).catch(() => {
+        if (active) {
+          setListingData(demoMode ? properties : []);
+          setApiMessage(demoMode ? 'API unavailable — demo listings only, not real offers.' : 'Unable to connect to listings. Check your connection and try again.');
+        }
+      }).finally(() => { if (active) setLoadingListings(false); });
+    }, 300);
+    return () => { active = false; clearTimeout(timer); };
+  }, [query, filter, demoMode]);
   const filtered = useMemo(() => listingData.filter(p => {
     const q = query.trim().toLowerCase();
     const matchesQuery = !q || `${p.title} ${p.district} ${p.sector} ${p.type}`.toLowerCase().includes(q);
-    const matchesFilter = filter === 'All' || p.type === filter;
+    const matchesFilter = filter === 'All' || (filter === 'Verified' ? p.verified : p.type === filter);
     return matchesQuery && matchesFilter && p.available && (!showSaved || saved.includes(p.id));
-  }), [query, filter, showSaved, saved]);
+  }), [listingData, query, filter, showSaved, saved]);
   const toggleSave = async (id: string) => {
     if (!user) { setAuthVisible(true); return; }
     const alreadySaved = saved.includes(id);
