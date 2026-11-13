@@ -4,7 +4,7 @@ const apiBaseUrl = process.env.EXPO_PUBLIC_API_URL?.replace(/\/$/, '');
 const TOKEN_KEY = 'housingconnect_access_token';
 export type ApiProperty = {
   id: string; title: string; description: string; propertyType: string;
-  district: string; sector: string; monthlyRentRwf: number; bedrooms: number;
+  district: string; sector: string; cell?: string | null; address?: string | null; monthlyRentRwf: number; bedrooms: number;
   bathrooms: number; furnished: boolean; available: boolean; verifiedAt: string | null; status?: string; depositRwf?: number;
   images: { id: string; url: string; sortOrder: number }[];
 };
