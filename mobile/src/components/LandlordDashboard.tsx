@@ -22,7 +22,7 @@ export function LandlordDashboard({onClose,phone,onDeleted}:Props){
    {!!error&&<Text style={styles.error}>{error}</Text>}
    <Pressable onPress={refresh} style={styles.refresh}><Text style={styles.refreshText}>Refresh</Text></Pressable>
    <Pressable onPress={()=>setVerificationVisible(true)} style={styles.verify}><Text style={styles.verifyText}>Open identity & property verification centre</Text></Pressable>
-   <Pressable onPress={()=>setDeletionVisible(true)} style={styles.deleteAccount}><Text style={styles.deleteAccountText}>Delete my account</Text></Pressable>
+   <Pressable onPress={()=>setDeletionVisible(true)} style={styles.deleteAccount}><Text style={styles.deleteAccountText}>Account settings & privacy</Text></Pressable>
    <Text style={styles.section}>My properties ({properties.length})</Text>
    {properties.length===0&&<Text style={styles.empty}>You have not submitted a property yet.</Text>}
    {properties.map(item=><View key={item.id} style={styles.card}><Text style={styles.cardTitle}>{item.title}</Text><Text style={styles.meta}>{item.district}, {item.sector} · RWF {item.monthlyRentRwf.toLocaleString('en-US')}/month</Text><Text style={styles.status}>Status: {item.status}</Text><Text style={styles.meta}>Availability: {item.available?'Available':'Not available'}</Text>
