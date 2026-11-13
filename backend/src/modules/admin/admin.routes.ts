@@ -10,6 +10,8 @@ import { recordAuditLogSafely } from '../audit/audit.service.js';
 export const adminRouter = Router();
 adminRouter.use(authenticate, allowRoles(UserRole.ADMIN));
 
+const paginationSchema = z.object({ page: z.coerce.number().int().min(1).default(1), limit: z.coerce.number().int().min(1).max(100).optional() });
+
 adminRouter.get('/overview', asyncHandler(async (_req, res) => {
   const [users, properties, pending, reports, openViewings] = await Promise.all([
     prisma.user.count(), prisma.property.count(),
@@ -63,8 +65,10 @@ adminRouter.patch('/reports/:id', asyncHandler(async (req, res) => {
 }));
 
 adminRouter.get('/users', asyncHandler(async (req, res) => {
-  const page = Math.max(1, Number(req.query.page) || 1);
-  const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 30));
+  const parsed = paginationSchema.safeParse(req.query);
+  if (!parsed.success) { res.status(400).json({ message: 'Invalid pagination parameters.' }); return; }
+  const page = parsed.data.page;
+  const limit = parsed.data.limit ?? 30;
   const [data, total] = await Promise.all([
     prisma.user.findMany({ select: { id: true, fullName: true, phone: true, email: true, role: true, isActive: true, phoneVerifiedAt: true, createdAt: true }, orderBy: { createdAt: 'desc' }, skip: (page - 1) * limit, take: limit }),
     prisma.user.count(),
@@ -94,8 +98,10 @@ adminRouter.patch('/users/:id/role', asyncHandler(async (req, res) => {
 }));
 
 adminRouter.get('/audit-logs', asyncHandler(async (req, res) => {
-  const page = Math.max(1, Number(req.query.page) || 1);
-  const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 50));
+  const parsed = paginationSchema.safeParse(req.query);
+  if (!parsed.success) { res.status(400).json({ message: 'Invalid pagination parameters.' }); return; }
+  const page = parsed.data.page;
+  const limit = parsed.data.limit ?? 50;
   const [data, total] = await Promise.all([
     prisma.auditLog.findMany({ orderBy: { createdAt: 'desc' }, skip: (page - 1) * limit, take: limit }),
     prisma.auditLog.count(),
