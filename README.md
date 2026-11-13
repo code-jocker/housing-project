@@ -14,10 +14,13 @@ A mobile-first rental marketplace connecting tenants with landlords and authoriz
 - Public published-property discovery, search and property details
 - Tenant and landlord registration/login with secure token storage
 - Phone OTP verification and password reset; password reset revokes old access tokens
+- Phone-OTP-confirmed self-service account deletion, including associated marketplace records and private verification evidence
 - Saved properties synced with the API
 - Landlord property submission, photo upload and listing status management
 - Tenant viewing requests, landlord responses and owner contact after acceptance
 - Listing reports, admin moderation, account activation/role management
+- Private identity-document and property-authority verification submissions using short-lived S3-compatible upload/download URLs
+- Administrator identity and property evidence queues; a property receives a verified badge only after both owner identity and property-authority checks are approved
 - In-app notifications for viewing, report and listing-review events
 - Application audit trail for important property, viewing and administrator actions
 - PostgreSQL migrations and automated API integration tests
@@ -43,3 +46,4 @@ Demo properties are fictional. Use `EXPO_PUBLIC_DEMO_MODE=true` only for local d
 - [Backend setup and API](backend/README.md)
 - [Mobile development and Android builds](mobile/README.md)
 - [Deployment and release checklist](DEPLOYMENT.md)
+- [Staging and production QA checklist](QA_CHECKLIST.md)

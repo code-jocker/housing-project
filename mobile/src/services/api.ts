@@ -4,7 +4,7 @@ const apiBaseUrl = process.env.EXPO_PUBLIC_API_URL?.replace(/\/$/, '');
 const TOKEN_KEY = 'housingconnect_access_token';
 export type ApiProperty = {
   id: string; title: string; description: string; propertyType: string;
-  district: string; sector: string; monthlyRentRwf: number; bedrooms: number;
+  district: string; sector: string; cell?: string | null; address?: string | null; monthlyRentRwf: number; bedrooms: number;
   bathrooms: number; furnished: boolean; available: boolean; verifiedAt: string | null; status?: string; depositRwf?: number;
   images: { id: string; url: string; sortOrder: number }[];
 };
@@ -22,9 +22,40 @@ async function request<T>(path: string, options: RequestInit = {}, authenticated
   if (!response.ok) throw new Error(payload.message || `API request failed (${response.status}).`);
   return payload as T;
 }
-export async function getProperties(): Promise<ApiProperty[]> {
-  const response = await request<PropertyListResponse>('/api/v1/properties?limit=30', {}, false);
-  return response.data;
+export type PropertySearchFilters = {
+  q?: string;
+  type?: string;
+  verified?: boolean;
+  page?: number;
+  limit?: number;
+  district?: string;
+  sector?: string;
+  minRent?: number;
+  maxRent?: number;
+  bedrooms?: number;
+};
+export type PropertyPage = {
+  data: ApiProperty[];
+  pagination: { page: number; limit: number; total: number; pages: number };
+};
+
+export async function getPropertiesPage(filters: PropertySearchFilters = {}): Promise<PropertyPage> {
+  const params = new URLSearchParams();
+  params.set('limit', String(filters.limit ?? 30));
+  if (filters.q?.trim()) params.set('q', filters.q.trim());
+  if (filters.type) params.set('type', filters.type);
+  if (filters.verified) params.set('verified', 'true');
+  if (filters.page) params.set('page', String(filters.page));
+  if (filters.district) params.set('district', filters.district);
+  if (filters.sector) params.set('sector', filters.sector);
+  if (filters.minRent !== undefined) params.set('minRent', String(filters.minRent));
+  if (filters.maxRent !== undefined) params.set('maxRent', String(filters.maxRent));
+  if (filters.bedrooms !== undefined) params.set('bedrooms', String(filters.bedrooms));
+  return request<PropertyPage>(`/api/v1/properties?${params.toString()}`, {}, false);
+}
+
+export async function getProperties(filters: PropertySearchFilters = {}): Promise<ApiProperty[]> {
+  return (await getPropertiesPage(filters)).data;
 }
 export type RegisterInput = { fullName: string; phone: string; email?: string; password: string; role?: 'TENANT' | 'LANDLORD' };
 type AuthResponse = { token: string; user: AuthUser };
@@ -80,7 +111,7 @@ export async function getMyProperties(): Promise<ApiProperty[]> {
   return (await request<{ data: ApiProperty[] }>('/api/v1/marketplace/my-properties')).data;
 }
 
-export type AdminOverview = { users: number; properties: number; pendingListings: number; openReports: number; pendingViewings: number };
+export type AdminOverview = { users: number; properties: number; pendingListings: number; openReports: number; pendingViewings: number; pendingIdentityVerifications: number; pendingPropertyVerifications: number };
 export type AdminPendingProperty = ApiProperty & { status: string; owner: { id: string; fullName: string; phone: string; role: string; phoneVerifiedAt: string | null } };
 export type AdminReport = { id: string; reason: string; details: string | null; createdAt: string; property: { id: string; title: string; district: string; sector: string; status: string }; reporter: { id: string; fullName: string; phone: string } };
 export async function getAdminOverview(): Promise<AdminOverview> {
@@ -163,4 +194,70 @@ export async function requestPasswordReset(phone: string): Promise<{ message: st
 }
 export async function confirmPasswordReset(phone: string, code: string, newPassword: string): Promise<void> {
   await request('/api/v1/auth/password-reset/confirm', { method: 'POST', body: JSON.stringify({ phone, code, newPassword }) }, false);
+}
+
+
+export type VerificationState = 'PENDING' | 'APPROVED' | 'REJECTED';
+export type MyVerification = {
+  identity: { id: string; legalName: string; documentType: string; documentLast4: string; status: VerificationState; rejectionReason: string | null; submittedAt: string; reviewedAt: string | null } | null;
+  properties: { id: string; property: { id: string; title: string; district: string; sector: string }; documentType: string; status: VerificationState; rejectionReason: string | null; submittedAt: string; reviewedAt: string | null }[];
+};
+export async function getMyVerification(): Promise<MyVerification> {
+  return request<MyVerification>('/api/v1/verification/me');
+}
+export async function uploadVerificationDocument(uri: string, contentType: 'application/pdf' | 'image/jpeg' | 'image/png', purpose: 'IDENTITY' | 'PROPERTY'): Promise<string> {
+  const signature = await request<{ uploadUrl: string; objectKey: string; requiredHeaders: Record<string, string> }>('/api/v1/verification/documents/upload-url', {
+    method: 'POST',
+    body: JSON.stringify({ purpose, contentType }),
+  });
+  const fileResponse = await fetch(uri);
+  if (!fileResponse.ok) throw new Error('Could not read the selected document.');
+  const blob = await fileResponse.blob();
+  if (blob.size > 10 * 1024 * 1024) throw new Error('Verification documents must be 10 MB or smaller.');
+  const uploaded = await fetch(signature.uploadUrl, { method: 'PUT', headers: signature.requiredHeaders, body: blob });
+  if (!uploaded.ok) throw new Error('Secure document upload failed. Try again.');
+  return signature.objectKey;
+}
+export async function submitIdentityVerification(input: { legalName: string; documentType: 'NATIONAL_ID' | 'PASSPORT' | 'RESIDENCE_PERMIT'; documentLast4: string; evidenceObjectKey: string }) {
+  return request('/api/v1/verification/identity', { method: 'POST', body: JSON.stringify(input) });
+}
+export async function submitPropertyVerification(propertyId: string, input: { documentType: 'LAND_TITLE' | 'LEASE_AUTHORIZATION' | 'OWNER_CONSENT' | 'AGENT_MANDATE'; authorizationConfirmed: true; evidenceObjectKey: string }) {
+  return request('/api/v1/verification/properties/' + encodeURIComponent(propertyId), { method: 'POST', body: JSON.stringify(input) });
+}
+export type AdminIdentityVerification = {
+  id: string; legalName: string; documentType: string; documentLast4: string; status: VerificationState; submittedAt: string;
+  user: { id: string; fullName: string; phone: string; email: string | null; phoneVerifiedAt: string | null; role: string };
+};
+export type AdminPropertyVerification = {
+  id: string; documentType: string; authorizationConfirmed: boolean; status: VerificationState; submittedAt: string;
+  owner: { id: string; fullName: string; phone: string; role: string; identityVerification: { status: VerificationState } | null };
+  property: { id: string; title: string; district: string; sector: string; monthlyRentRwf: number; status: string };
+};
+export async function getAdminIdentityVerifications(): Promise<AdminIdentityVerification[]> {
+  return (await request<{ data: AdminIdentityVerification[] }>('/api/v1/admin/verifications/identity')).data;
+}
+export async function getAdminPropertyVerifications(): Promise<AdminPropertyVerification[]> {
+  return (await request<{ data: AdminPropertyVerification[] }>('/api/v1/admin/verifications/properties')).data;
+}
+export async function getAdminVerificationDocumentUrl(kind: 'identity' | 'property', id: string): Promise<string> {
+  return (await request<{ url: string }>('/api/v1/admin/verifications/' + kind + '/' + encodeURIComponent(id) + '/document')).url;
+}
+export async function reviewIdentityVerification(id: string, decision: 'APPROVED' | 'REJECTED', reason?: string) {
+  return request('/api/v1/admin/verifications/identity/' + encodeURIComponent(id), { method: 'PATCH', body: JSON.stringify({ decision, ...(reason ? { reason } : {}) }) });
+}
+export async function reviewPropertyVerification(id: string, decision: 'APPROVED' | 'REJECTED', reason?: string) {
+  return request('/api/v1/admin/verifications/properties/' + encodeURIComponent(id), { method: 'PATCH', body: JSON.stringify({ decision, ...(reason ? { reason } : {}) }) });
+}
+
+
+export async function requestAccountDeletion(phone: string): Promise<{ message: string; debugCode?: string; waitSeconds?: number }> {
+  return request('/api/v1/auth/account-deletion/request', { method: 'POST', body: JSON.stringify({ phone }) }, false);
+}
+export async function confirmAccountDeletion(phone: string, code: string): Promise<void> {
+  await request('/api/v1/auth/account-deletion/confirm', { method: 'POST', body: JSON.stringify({ phone, code }) }, false);
+}
+
+
+export async function getAccountExport(): Promise<Record<string, unknown>> {
+  return request<Record<string, unknown>>('/api/v1/auth/account/export');
 }

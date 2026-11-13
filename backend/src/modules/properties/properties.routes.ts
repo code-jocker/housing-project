@@ -27,18 +27,51 @@ const propertySchema = z.object({
 });
 
 propertiesRouter.get('/', asyncHandler(async (req, res) => {
-  const page = Math.max(1, Number(req.query.page) || 1);
-  const limit = Math.min(50, Math.max(1, Number(req.query.limit) || 20));
-  const minRent = req.query.minRent ? Number(req.query.minRent) : undefined;
-  const maxRent = req.query.maxRent ? Number(req.query.maxRent) : undefined;
-  const bedrooms = req.query.bedrooms ? Number(req.query.bedrooms) : undefined;
+  const querySchema = z.object({
+    page: z.coerce.number().int().min(1).max(100000).default(1),
+    limit: z.coerce.number().int().min(1).max(50).default(20),
+    minRent: z.coerce.number().int().min(0).max(100000000).optional(),
+    maxRent: z.coerce.number().int().min(0).max(100000000).optional(),
+    bedrooms: z.coerce.number().int().min(0).max(30).optional(),
+    q: z.string().trim().min(2).max(100).optional(),
+    district: z.string().trim().min(2).max(80).optional(),
+    sector: z.string().trim().min(2).max(80).optional(),
+    type: z.enum(['Apartment', 'House', 'Studio', 'Room', 'Commercial']).optional(),
+    verified: z.enum(['true', 'false']).optional(),
+  }).safeParse(req.query);
+
+  if (!querySchema.success) {
+    res.status(400).json({ message: 'Invalid property search filters.', errors: querySchema.error.flatten() });
+    return;
+  }
+
+  const { page, limit, minRent, maxRent, bedrooms, q: search, district, sector, type, verified } = querySchema.data;
+  if (minRent !== undefined && maxRent !== undefined && minRent > maxRent) {
+    res.status(400).json({ message: 'Minimum rent cannot exceed maximum rent.' });
+    return;
+  }
+
   const where = {
-    status: PropertyStatus.PUBLISHED, available: true,
-    ...(typeof req.query.district === 'string' ? { district: { equals: req.query.district, mode: 'insensitive' as const } } : {}),
-    ...(typeof req.query.sector === 'string' ? { sector: { equals: req.query.sector, mode: 'insensitive' as const } } : {}),
-    ...(typeof req.query.type === 'string' ? { propertyType: req.query.type } : {}),
-    ...(minRent !== undefined || maxRent !== undefined ? { monthlyRentRwf: { ...(minRent !== undefined && Number.isFinite(minRent) ? { gte: minRent } : {}), ...(maxRent !== undefined && Number.isFinite(maxRent) ? { lte: maxRent } : {}) } } : {}),
-    ...(bedrooms !== undefined && Number.isInteger(bedrooms) ? { bedrooms: { gte: bedrooms } } : {}),
+    status: PropertyStatus.PUBLISHED,
+    available: true,
+    owner: { isActive: true },
+    ...(district ? { district: { equals: district, mode: 'insensitive' as const } } : {}),
+    ...(sector ? { sector: { equals: sector, mode: 'insensitive' as const } } : {}),
+    ...(type ? { propertyType: type } : {}),
+    ...(verified === 'true' ? { verifiedAt: { not: null } } : {}),
+    ...(search ? {
+      OR: [
+        { title: { contains: search, mode: 'insensitive' as const } },
+        { propertyType: { contains: search, mode: 'insensitive' as const } },
+        { description: { contains: search, mode: 'insensitive' as const } },
+        { district: { contains: search, mode: 'insensitive' as const } },
+        { sector: { contains: search, mode: 'insensitive' as const } },
+        { cell: { contains: search, mode: 'insensitive' as const } },
+        { address: { contains: search, mode: 'insensitive' as const } },
+      ],
+    } : {}),
+    ...(minRent !== undefined || maxRent !== undefined ? { monthlyRentRwf: { ...(minRent !== undefined ? { gte: minRent } : {}), ...(maxRent !== undefined ? { lte: maxRent } : {}) } } : {}),
+    ...(bedrooms !== undefined ? { bedrooms: { gte: bedrooms } } : {}),
   };
   const [items, total] = await Promise.all([
     prisma.property.findMany({ where, include: { images: { orderBy: { sortOrder: 'asc' } }, owner: { select: { id: true, fullName: true, role: true } } }, orderBy: { createdAt: 'desc' }, skip: (page - 1) * limit, take: limit }),
@@ -48,7 +81,7 @@ propertiesRouter.get('/', asyncHandler(async (req, res) => {
 }));
 
 propertiesRouter.get('/:id', asyncHandler(async (req, res) => {
-  const property = await prisma.property.findFirst({ where: { id: req.params.id, status: PropertyStatus.PUBLISHED, available: true }, include: { images: { orderBy: { sortOrder: 'asc' } }, owner: { select: { id: true, fullName: true, role: true } } } });
+  const property = await prisma.property.findFirst({ where: { id: req.params.id, status: PropertyStatus.PUBLISHED, available: true, owner: { isActive: true } }, include: { images: { orderBy: { sortOrder: 'asc' } }, owner: { select: { id: true, fullName: true, role: true } } } });
   if (!property) { res.status(404).json({ message: 'Property not found.' }); return; }
   res.json({ data: property });
 }));
@@ -82,7 +115,17 @@ propertiesRouter.patch('/:id', authenticate, allowRoles(UserRole.LANDLORD, UserR
   const parsed = propertySchema.partial().safeParse(req.body);
   if (!parsed.success) { res.status(400).json({ message: 'Invalid property details.', errors: parsed.error.flatten() }); return; }
   const { images, ...data } = parsed.data;
-  const updated = await prisma.property.update({ where: { id: current.id }, data: { ...data, status: req.auth!.role === UserRole.ADMIN ? current.status : PropertyStatus.PENDING_REVIEW, ...(images ? { images: { deleteMany: {}, create: images.map((url, sortOrder) => ({ url, sortOrder })) } } : {}) }, include: { images: true } });
+  const updated = await prisma.$transaction(async tx => {
+    const result = await tx.property.update({
+      where: { id: current.id },
+      data: { ...data, status: req.auth!.role === UserRole.ADMIN ? current.status : PropertyStatus.PENDING_REVIEW, ...(req.auth!.role === UserRole.ADMIN ? {} : { verifiedAt: null }), ...(images ? { images: { deleteMany: {}, create: images.map((url, sortOrder) => ({ url, sortOrder })) } } : {}) },
+      include: { images: true },
+    });
+    if (req.auth!.role !== UserRole.ADMIN) {
+      await tx.propertyVerification.deleteMany({ where: { propertyId: current.id } });
+    }
+    return result;
+  });
   await recordAuditLogSafely(req.auth!.userId, 'PROPERTY_UPDATED', 'Property', current.id);
   res.json({ message: 'Property updated. Changes are pending review.', data: updated });
 }));

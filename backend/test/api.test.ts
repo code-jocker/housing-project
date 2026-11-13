@@ -85,6 +85,12 @@ test('tenant, landlord and admin marketplace journey', async () => {
   const republished = await request(app).patch(`/api/v1/admin/properties/${propertyId}/review`).set('Authorization', `Bearer ${adminToken}`).send({ decision: 'PUBLISHED' });
   assert.equal(republished.status, 200);
 
+  const searched = await request(app).get('/api/v1/properties?q=Test%20apartment');
+  assert.equal(searched.status, 200);
+  assert.ok(searched.body.data.some((item: { id: string }) => item.id === propertyId));
+  assert.equal((await request(app).get('/api/v1/properties?page=invalid')).status, 400);
+  assert.equal((await request(app).get('/api/v1/properties?q=a')).status, 400);
+
   const favorite = await request(app).post(`/api/v1/marketplace/favorites/${propertyId}`).set('Authorization', `Bearer ${tenantToken}`);
   assert.equal(favorite.status, 201);
   const favorites = await request(app).get('/api/v1/marketplace/favorites').set('Authorization', `Bearer ${tenantToken}`);

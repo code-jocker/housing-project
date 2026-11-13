@@ -10,11 +10,16 @@ import { adminRouter } from './modules/admin/admin.routes.js';
 import { notificationsRouter } from './modules/notifications/notifications.routes.js';
 import { uploadsRouter } from './modules/uploads/uploads.routes.js';
 import { healthRouter } from './modules/health/health.routes.js';
+import { verificationRouter } from './modules/verification/verification.routes.js';
 
 export const app = express();
 app.disable('x-powered-by');
 app.use(helmet());
-app.use(cors({ origin: env.CLIENT_ORIGIN === '*' ? true : env.CLIENT_ORIGIN.split(',').map(value => value.trim()) }));
+const allowedOrigins = env.CLIENT_ORIGIN.split(',').map(value => value.trim()).filter(Boolean);
+app.use(cors({
+  // Native mobile clients normally omit Origin; browser clients must match the allowlist.
+  origin: (origin, callback) => callback(null, !origin || allowedOrigins.includes('*') || allowedOrigins.includes(origin)),
+}));
 app.use(express.json({ limit: '1mb' }));
 app.use(rateLimit({ windowMs: 15 * 60 * 1000, limit: 200, standardHeaders: 'draft-8', legacyHeaders: false }));
 app.get('/', (_req, res) => res.json({ name: 'HousingConnect API', version: '1.0.0', docs: 'See README.md for endpoints.' }));
@@ -25,6 +30,7 @@ app.use('/api/v1/marketplace', marketplaceRouter);
 app.use('/api/v1/admin', adminRouter);
 app.use('/api/v1/notifications', notificationsRouter);
 app.use('/api/v1/uploads', uploadsRouter);
+app.use('/api/v1/verification', verificationRouter);
 app.use((_req, res) => res.status(404).json({ message: 'Route not found.' }));
 app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   console.error(error);

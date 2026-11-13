@@ -3,10 +3,12 @@ export type Property = {
   title: string;
   district: string;
   sector: string;
+  cell?: string | null;
+  address?: string | null;
   rent: number;
   bedrooms: number;
   bathrooms: number;
-  type: 'Apartment' | 'House' | 'Studio';
+  type: 'Apartment' | 'House' | 'Studio' | 'Room' | 'Commercial';
   image: string;
   verified: boolean;
   available: boolean;

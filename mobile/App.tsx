@@ -1,9 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { SafeAreaView, View, Text, TextInput, ScrollView, Image, Pressable, StyleSheet, Alert } from 'react-native';
+import { SafeAreaView, View, Text, TextInput, ScrollView, Image, Pressable, StyleSheet, Alert, Linking } from 'react-native';
 import { StatusBar as ExpoStatusBar } from 'expo-status-bar';
 import { properties, Property } from './src/data/properties';
 import { colors } from './src/theme';
-import { addFavorite, AuthUser, getFavorites, getProperties, getSession, logout, removeFavorite, reportProperty } from './src/services/api';
+import { addFavorite, AuthUser, getFavorites, getProperties, getPropertiesPage, getSession, logout, removeFavorite, reportProperty } from './src/services/api';
 import { AuthScreen } from './src/components/AuthScreen';
 import { ViewingRequestForm } from './src/components/ViewingRequestForm';
 import { CreateListingForm } from './src/components/CreateListingForm';
@@ -36,6 +36,10 @@ function PropertyCard({ item, saved, onSave, onOpen }: { item: Property; saved: 
 export default function App() {
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState('All');
+  const [advancedFiltersVisible, setAdvancedFiltersVisible] = useState(false);
+  const [minRentText, setMinRentText] = useState('');
+  const [maxRentText, setMaxRentText] = useState('');
+  const [bedroomsText, setBedroomsText] = useState('');
   const [showSaved, setShowSaved] = useState(false);
   const demoMode = process.env.EXPO_PUBLIC_DEMO_MODE === 'true';
   const [saved, setSaved] = useState<string[]>([]);
@@ -43,6 +47,9 @@ export default function App() {
   const [listingData, setListingData] = useState<Property[]>(demoMode ? properties : []);
   const [loadingListings, setLoadingListings] = useState(true);
   const [apiMessage, setApiMessage] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [user, setUser] = useState<AuthUser | null>(null);
   const [authVisible, setAuthVisible] = useState(false);
   const [viewingVisible, setViewingVisible] = useState(false);
@@ -55,21 +62,68 @@ export default function App() {
   useEffect(() => { getSession().then(async session => { setUser(session); if (session) { try { const items = await getFavorites(); setSaved(items.map(item => item.id)); } catch { /* Saved-list loading can be retried later. */ } } }); }, []);
   useEffect(() => {
     let active = true;
-    getProperties().then(items => {
-      if (!active) return;
-      if (items.length > 0) setListingData(items.map(item => ({ id: item.id, title: item.title, district: item.district, sector: item.sector, rent: item.monthlyRentRwf, bedrooms: item.bedrooms, bathrooms: item.bathrooms, type: item.propertyType as Property['type'], image: item.images[0]?.url || properties[0].image, verified: Boolean(item.verifiedAt), available: item.available, furnished: item.furnished, description: item.description })));
-      else setListingData(demoMode ? properties : []);
-      setApiMessage(items.length ? 'Live listings' : demoMode ? 'Demo listings — not real rental offers.' : 'No published properties are available yet.');
-    }).catch(() => { if (active) { setListingData(demoMode ? properties : []); setApiMessage(demoMode ? 'API unavailable — demo listings only, not real offers.' : 'Unable to connect to listings. Check your connection and try again.'); } })
-      .finally(() => { if (active) setLoadingListings(false); });
-    return () => { active = false; };
-  }, []);
+    const timer = setTimeout(() => {
+      setLoadingListings(true);
+      setCurrentPage(1);
+      if (showSaved) {
+        getFavorites().then(items => {
+          if (!active) return;
+          setListingData(items.map(item => ({ id: item.id, title: item.title, district: item.district, sector: item.sector, cell: item.cell, address: item.address, rent: item.monthlyRentRwf, bedrooms: item.bedrooms, bathrooms: item.bathrooms, type: item.propertyType as Property['type'], image: item.images[0]?.url || properties[0].image, verified: Boolean(item.verifiedAt), available: item.available, furnished: item.furnished, description: item.description })));
+          setTotalPages(1);
+          setApiMessage('Your saved properties');
+        }).catch(error => {
+          if (active) setApiMessage(error instanceof Error ? error.message : 'Could not load saved properties.');
+        }).finally(() => { if (active) setLoadingListings(false); });
+        return;
+      }
+      const minRentValue = minRentText.trim() ? Number(minRentText) : undefined;
+      const maxRentValue = maxRentText.trim() ? Number(maxRentText) : undefined;
+      const bedroomsValue = bedroomsText.trim() ? Number(bedroomsText) : undefined;
+      if ((minRentValue !== undefined && (!Number.isInteger(minRentValue) || minRentValue < 0)) ||
+          (maxRentValue !== undefined && (!Number.isInteger(maxRentValue) || maxRentValue < 0)) ||
+          (bedroomsValue !== undefined && (!Number.isInteger(bedroomsValue) || bedroomsValue < 0 || bedroomsValue > 30)) ||
+          (minRentValue !== undefined && maxRentValue !== undefined && minRentValue > maxRentValue)) {
+        setListingData([]);
+        setTotalPages(1);
+        setApiMessage('Enter valid whole-number rent limits and a bedroom count from 0 to 30.');
+        setLoadingListings(false);
+        return;
+      }
+      getPropertiesPage({
+        q: query.trim().length >= 2 ? query.trim() : undefined,
+        type: filter !== 'All' && filter !== 'Verified' ? filter : undefined,
+        verified: filter === 'Verified',
+        minRent: minRentValue,
+        maxRent: maxRentValue,
+        bedrooms: bedroomsValue,
+        page: 1,
+      }).then(result => {
+        if (!active) return;
+        const items = result.data;
+        setTotalPages(result.pagination.pages);
+        if (items.length > 0) setListingData(items.map(item => ({ id: item.id, title: item.title, district: item.district, sector: item.sector, cell: item.cell, address: item.address, rent: item.monthlyRentRwf, bedrooms: item.bedrooms, bathrooms: item.bathrooms, type: item.propertyType as Property['type'], image: item.images[0]?.url || properties[0].image, verified: Boolean(item.verifiedAt), available: item.available, furnished: item.furnished, description: item.description })));
+        else setListingData(demoMode ? properties : []);
+        setApiMessage(items.length ? 'Live listings' : demoMode ? 'Demo listings — not real rental offers.' : 'No published properties match these filters.');
+      }).catch(() => {
+        if (active) {
+          setListingData(demoMode ? properties : []);
+          setApiMessage(demoMode ? 'API unavailable — demo listings only, not real offers.' : 'Unable to connect to listings. Check your connection and try again.');
+        }
+      }).finally(() => { if (active) setLoadingListings(false); });
+    }, 300);
+    return () => { active = false; clearTimeout(timer); };
+  }, [query, filter, demoMode, showSaved, minRentText, maxRentText, bedroomsText]);
   const filtered = useMemo(() => listingData.filter(p => {
     const q = query.trim().toLowerCase();
-    const matchesQuery = !q || `${p.title} ${p.district} ${p.sector} ${p.type}`.toLowerCase().includes(q);
-    const matchesFilter = filter === 'All' || p.type === filter;
-    return matchesQuery && matchesFilter && p.available && (!showSaved || saved.includes(p.id));
-  }), [query, filter, showSaved, saved]);
+    const matchesQuery = !q || `${p.title} ${p.description} ${p.district} ${p.sector} ${p.type}`.toLowerCase().includes(q);
+    const matchesFilter = filter === 'All' || (filter === 'Verified' ? p.verified : p.type === filter);
+    const minRentValue = minRentText.trim() ? Number(minRentText) : undefined;
+    const maxRentValue = maxRentText.trim() ? Number(maxRentText) : undefined;
+    const bedroomsValue = bedroomsText.trim() ? Number(bedroomsText) : undefined;
+    const matchesRent = (minRentValue === undefined || p.rent >= minRentValue) && (maxRentValue === undefined || p.rent <= maxRentValue);
+    const matchesBedrooms = bedroomsValue === undefined || p.bedrooms >= bedroomsValue;
+    return matchesQuery && matchesFilter && matchesRent && matchesBedrooms && p.available && (!showSaved || saved.includes(p.id));
+  }), [listingData, query, filter, showSaved, saved, minRentText, maxRentText, bedroomsText]);
   const toggleSave = async (id: string) => {
     if (!user) { setAuthVisible(true); return; }
     const alreadySaved = saved.includes(id);
@@ -77,8 +131,31 @@ export default function App() {
     try { if (alreadySaved) await removeFavorite(id); else await addFavorite(id); }
     catch (error) { setSaved(current => alreadySaved ? [...current, id] : current.filter(x => x !== id)); setApiMessage(error instanceof Error ? error.message : 'Could not update saved properties.'); }
   };
+  const loadMoreListings = async () => {
+    if (loadingMore || currentPage >= totalPages) return;
+    setLoadingMore(true);
+    try {
+      const nextPage = currentPage + 1;
+      const result = await getPropertiesPage({
+        q: query.trim().length >= 2 ? query.trim() : undefined,
+        type: filter !== 'All' && filter !== 'Verified' ? filter : undefined,
+        verified: filter === 'Verified',
+        minRent: minRentText.trim() ? Number(minRentText) : undefined,
+        maxRent: maxRentText.trim() ? Number(maxRentText) : undefined,
+        bedrooms: bedroomsText.trim() ? Number(bedroomsText) : undefined,
+        page: nextPage,
+      });
+      const mapped = result.data.map(item => ({ id: item.id, title: item.title, district: item.district, sector: item.sector, cell: item.cell, address: item.address, rent: item.monthlyRentRwf, bedrooms: item.bedrooms, bathrooms: item.bathrooms, type: item.propertyType as Property['type'], image: item.images[0]?.url || properties[0].image, verified: Boolean(item.verifiedAt), available: item.available, furnished: item.furnished, description: item.description }));
+      setListingData(current => [...current.filter(existing => !mapped.some(item => item.id === existing.id)), ...mapped]);
+      setCurrentPage(nextPage);
+    } catch (error) {
+      setApiMessage(error instanceof Error ? error.message : 'Could not load more listings.');
+    } finally {
+      setLoadingMore(false);
+    }
+  };
   const onAuthenticated = async (account: AuthUser) => { setUser(account); setAuthVisible(false); try { const items = await getFavorites(); setSaved(items.map(item => item.id)); } catch { setSaved([]); } };
-  const onLogout = async () => { await logout(); setUser(null); setSaved([]); setAuthVisible(false); };
+  const onLogout = async () => { await logout(); setUser(null); setSaved([]); setShowSaved(false); setAuthVisible(false); };
 
   if (selected) return (
     <>
@@ -89,6 +166,10 @@ export default function App() {
         <View style={styles.metaRow}><Text style={styles.meta}>{selected.bedrooms} bedrooms</Text><Text style={styles.meta}>{selected.bathrooms} bathrooms</Text><Text style={styles.meta}>{selected.type}</Text></View>
         <Text style={styles.sectionTitle}>About this property</Text><Text style={styles.description}>{selected.description}</Text>
         <Text style={styles.sectionTitle}>Listing status</Text><Text style={styles.description}>{selected.verified ? 'Identity/listing review badge shown in this demo. Confirm ownership or authority to rent separately.' : 'This listing has not yet been verified. Exercise caution before paying any money.'}</Text>
+        <Pressable style={[styles.primaryButton,{backgroundColor:'#EAF3FC'}]} onPress={() => {
+          const location = [selected.address, selected.cell, selected.sector, selected.district, 'Rwanda'].filter(Boolean).join(', ');
+          void Linking.openURL('https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(location + ', Rwanda'));
+        }}><Text style={[styles.primaryButtonText,{color:colors.blue}]}>View neighbourhood on map (approximate)</Text></Pressable>
         <Pressable style={styles.primaryButton} onPress={() => { if (!user) { setSelected(null); setAuthVisible(true); } else if (user.role !== 'TENANT') { Alert.alert('Tenant account required', 'Sign in with a tenant account to request a viewing.'); } else { setViewingVisible(true); } }}><Text style={styles.primaryButtonText}>Request a viewing</Text></Pressable>
         <Pressable style={[styles.primaryButton,{backgroundColor:colors.danger}]} onPress={() => {
           if (!user) { setSelected(null); setAuthVisible(true); return; }
@@ -118,21 +199,28 @@ export default function App() {
       <View style={styles.content}><View style={styles.headingRow}><Text style={styles.sectionTitle}>{showSaved ? 'Saved properties' : 'Explore properties'}</Text><Text style={styles.count}>{filtered.length} found</Text></View>
         {!!apiMessage && <Text style={styles.apiNotice}>{apiMessage}</Text>}
         {loadingListings && <Text style={styles.apiNotice}>Checking for new listings…</Text>}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filters}>{['All', 'Verified', 'Apartment', 'House', 'Studio'].map(option => <Pressable key={option} onPress={() => setFilter(option)} style={[styles.filter, filter === option && styles.filterActive]}><Text style={[styles.filterText, filter === option && styles.filterTextActive]}>{option}</Text></Pressable>)}</ScrollView>
+        <Pressable onPress={() => setAdvancedFiltersVisible(value => !value)} style={styles.refresh}><Text style={styles.refreshText}>{advancedFiltersVisible ? 'Hide filters' : 'More filters · rent and bedrooms'}</Text></Pressable>
+        {advancedFiltersVisible && <View style={styles.metaRow}>
+          <TextInput value={minRentText} onChangeText={setMinRentText} keyboardType="numeric" placeholder="Min rent (RWF)" style={styles.filterInput}/>
+          <TextInput value={maxRentText} onChangeText={setMaxRentText} keyboardType="numeric" placeholder="Max rent (RWF)" style={styles.filterInput}/>
+          <TextInput value={bedroomsText} onChangeText={setBedroomsText} keyboardType="numeric" placeholder="Bedrooms min." style={styles.filterInput}/>
+        </View>}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filters}>{['All', 'Verified', 'Apartment', 'House', 'Studio', 'Room', 'Commercial'].map(option => <Pressable key={option} onPress={() => setFilter(option)} style={[styles.filter, filter === option && styles.filterActive]}><Text style={[styles.filterText, filter === option && styles.filterTextActive]}>{option}</Text></Pressable>)}</ScrollView>
         {filtered.map(item => <PropertyCard key={item.id} item={item} saved={saved.includes(item.id)} onSave={() => toggleSave(item.id)} onOpen={() => setSelected(item)} />)}
+        {!showSaved && currentPage < totalPages && <Pressable disabled={loadingMore} onPress={loadMoreListings} style={styles.primaryButton}><Text style={styles.primaryButtonText}>{loadingMore ? 'Loading…' : 'Load more properties'}</Text></Pressable>}
         {filtered.length === 0 && <View style={styles.empty}><Text style={styles.emptyTitle}>No properties found</Text><Text style={styles.description}>Try another district, sector or property type.</Text></View>}
       </View>
     </ScrollView><View style={styles.tabBar}><Pressable onPress={() => setShowSaved(false)}><Text style={!showSaved ? styles.tabActive : styles.tab}>⌂  Explore</Text></Pressable><Pressable onPress={() => { if (!user) setAuthVisible(true); else setShowSaved(true); }}><Text style={showSaved ? styles.tabActive : styles.tab}>♡  Saved ({saved.length})</Text></Pressable><Pressable onPress={() => user ? setNotificationsVisible(true) : setAuthVisible(true)}><Text style={styles.tab}>♢ Alerts</Text></Pressable><Pressable onPress={() => { if (!user) setAuthVisible(true); else if (user.role === 'LANDLORD' || user.role === 'AGENT') setListingVisible(true); else Alert.alert('Landlord account required', 'Use a landlord or agent account to publish a property.'); }}><Text style={styles.tab}>＋  List a home</Text></Pressable><Pressable onPress={() => user?.role === 'ADMIN' ? setAdminVisible(true) : user?.role === 'LANDLORD' || user?.role === 'AGENT' ? setLandlordVisible(true) : user ? onLogout() : setAuthVisible(true)}><Text style={styles.tab}>{user?.role === 'ADMIN' ? 'Admin' : user?.role === 'LANDLORD' || user?.role === 'AGENT' ? 'My listings' : user?.role === 'TENANT' ? 'My requests' : user ? '↪ Sign out' : '☻ Profile'}</Text></Pressable></View></SafeAreaView>
     {authVisible && <AuthScreen onAuthenticated={onAuthenticated} onClose={() => setAuthVisible(false)} onForgotPassword={() => { setAuthVisible(false); setPasswordResetVisible(true); }} />}
     {adminVisible && <AdminDashboard onClose={() => setAdminVisible(false)} />}
-    {landlordVisible && <LandlordDashboard onClose={() => setLandlordVisible(false)} />}
-    {tenantVisible && <TenantDashboard onClose={() => setTenantVisible(false)} />}
+    {landlordVisible && <LandlordDashboard phone={user?.phone || ''} onDeleted={async () => { setLandlordVisible(false); await onLogout(); }} onClose={() => setLandlordVisible(false)} />}
+    {tenantVisible && <TenantDashboard phone={user?.phone || ''} onDeleted={async () => { setTenantVisible(false); await onLogout(); }} onClose={() => setTenantVisible(false)} />}
     {notificationsVisible && <NotificationsScreen onClose={() => setNotificationsVisible(false)} />}
-    {listingVisible && <CreateListingForm onClose={() => setListingVisible(false)} onCreated={async () => { setListingVisible(false); Alert.alert('Listing submitted', 'Your property is pending platform review.'); try { const items = await getProperties(); if (items.length) setListingData(items.map(item => ({ id: item.id, title: item.title, district: item.district, sector: item.sector, rent: item.monthlyRentRwf, bedrooms: item.bedrooms, bathrooms: item.bathrooms, type: item.propertyType as Property['type'], image: item.images[0]?.url || properties[0].image, verified: Boolean(item.verifiedAt), available: item.available, furnished: item.furnished, description: item.description }))); } catch { /* Refresh can be retried when the feed reloads. */ } }} />}
+    {listingVisible && <CreateListingForm onClose={() => setListingVisible(false)} onCreated={async () => { setListingVisible(false); Alert.alert('Listing submitted', 'Your property is pending platform review.'); try { const items = await getProperties(); if (items.length) setListingData(items.map(item => ({ id: item.id, title: item.title, district: item.district, sector: item.sector, cell: item.cell, address: item.address, rent: item.monthlyRentRwf, bedrooms: item.bedrooms, bathrooms: item.bathrooms, type: item.propertyType as Property['type'], image: item.images[0]?.url || properties[0].image, verified: Boolean(item.verifiedAt), available: item.available, furnished: item.furnished, description: item.description }))); } catch { /* Refresh can be retried when the feed reloads. */ } }} />}
     </>
   );
 }
 
 const styles = StyleSheet.create({
-  safe:{flex:1,backgroundColor:colors.background},header:{paddingHorizontal:20,paddingTop:12,paddingBottom:18,flexDirection:'row',justifyContent:'space-between',alignItems:'center'},brand:{fontSize:23,fontWeight:'800',color:colors.navy,letterSpacing:-0.6},country:{fontSize:9,fontWeight:'700',letterSpacing:1.2,color:colors.muted,marginTop:3},avatar:{width:40,height:40,borderRadius:14,backgroundColor:colors.blueLight,alignItems:'center',justifyContent:'center'},avatarText:{color:colors.blue,fontWeight:'800'},hero:{backgroundColor:colors.navy,padding:22,paddingBottom:26},eyebrow:{fontSize:10,fontWeight:'800',letterSpacing:1.5,color:'#A9D2F2'},heroTitle:{fontSize:29,lineHeight:35,fontWeight:'800',color:'#FFFFFF',marginTop:10,maxWidth:300},heroSub:{fontSize:13,lineHeight:20,color:'#D7E4EF',marginTop:8},searchBox:{height:52,backgroundColor:'#FFFFFF',borderRadius:13,marginTop:20,paddingHorizontal:14,flexDirection:'row',alignItems:'center'},searchIcon:{fontSize:25,color:colors.blue,marginRight:8},searchInput:{flex:1,fontSize:13,color:colors.text},content:{paddingHorizontal:18,paddingTop:22,paddingBottom:28},headingRow:{flexDirection:'row',justifyContent:'space-between',alignItems:'center'},sectionTitle:{fontSize:18,fontWeight:'800',color:colors.navy,marginBottom:12},count:{fontSize:12,color:colors.muted,marginBottom:12},filters:{gap:8,paddingBottom:17},filter:{paddingHorizontal:15,paddingVertical:9,borderRadius:22,backgroundColor:'#FFFFFF',borderWidth:1,borderColor:colors.border},filterActive:{backgroundColor:colors.blue,borderColor:colors.blue},filterText:{fontSize:12,fontWeight:'700',color:colors.muted},filterTextActive:{color:'#FFFFFF'},card:{backgroundColor:'#FFFFFF',borderRadius:17,overflow:'hidden',marginBottom:16,borderWidth:1,borderColor:colors.border},photo:{height:190,width:'100%',backgroundColor:'#DCE5ED'},verified:{position:'absolute',top:12,left:12,backgroundColor:'#E7F6EF',paddingHorizontal:10,paddingVertical:6,borderRadius:20},verifiedText:{fontSize:10,fontWeight:'800',color:colors.green},heart:{position:'absolute',right:12,top:12,width:36,height:36,borderRadius:18,backgroundColor:'#FFFFFF',alignItems:'center',justifyContent:'center'},heartText:{fontSize:22,color:colors.danger},cardBody:{padding:15},price:{fontSize:17,fontWeight:'800',color:colors.blue},perMonth:{fontSize:11,fontWeight:'500',color:colors.muted},propertyTitle:{fontSize:15,fontWeight:'800',color:colors.navy,marginTop:7},location:{fontSize:12,color:colors.muted,marginTop:6},metaRow:{flexDirection:'row',gap:8,marginTop:12,flexWrap:'wrap'},meta:{fontSize:10,fontWeight:'700',color:'#52677D',backgroundColor:'#F2F5F8',paddingHorizontal:9,paddingVertical:6,borderRadius:7},empty:{padding:25,alignItems:'center'},emptyTitle:{fontSize:16,fontWeight:'800',color:colors.navy,marginBottom:7},tabBar:{backgroundColor:'#FFFFFF',borderTopWidth:1,borderTopColor:colors.border,paddingVertical:13,paddingHorizontal:10,flexDirection:'row',justifyContent:'space-around'},tab:{fontSize:10,color:colors.muted,fontWeight:'700'},tabActive:{fontSize:10,color:colors.blue,fontWeight:'800'},back:{padding:18},backText:{fontSize:14,color:colors.blue,fontWeight:'800'},detailPhoto:{width:'100%',height:260,backgroundColor:'#DCE5ED'},detailBody:{padding:20},detailTitle:{fontSize:23,fontWeight:'800',color:colors.navy,marginTop:8},description:{fontSize:13,lineHeight:21,color:'#52677D',marginBottom:10},apiNotice:{fontSize:11,color:colors.muted,marginBottom:12},primaryButton:{height:52,backgroundColor:colors.blue,borderRadius:13,alignItems:'center',justifyContent:'center',marginTop:18},primaryButtonText:{fontSize:14,fontWeight:'800',color:'#FFFFFF'}
+  safe:{flex:1,backgroundColor:colors.background},header:{paddingHorizontal:20,paddingTop:12,paddingBottom:18,flexDirection:'row',justifyContent:'space-between',alignItems:'center'},brand:{fontSize:23,fontWeight:'800',color:colors.navy,letterSpacing:-0.6},country:{fontSize:9,fontWeight:'700',letterSpacing:1.2,color:colors.muted,marginTop:3},avatar:{width:40,height:40,borderRadius:14,backgroundColor:colors.blueLight,alignItems:'center',justifyContent:'center'},avatarText:{color:colors.blue,fontWeight:'800'},hero:{backgroundColor:colors.navy,padding:22,paddingBottom:26},eyebrow:{fontSize:10,fontWeight:'800',letterSpacing:1.5,color:'#A9D2F2'},heroTitle:{fontSize:29,lineHeight:35,fontWeight:'800',color:'#FFFFFF',marginTop:10,maxWidth:300},heroSub:{fontSize:13,lineHeight:20,color:'#D7E4EF',marginTop:8},searchBox:{height:52,backgroundColor:'#FFFFFF',borderRadius:13,marginTop:20,paddingHorizontal:14,flexDirection:'row',alignItems:'center'},searchIcon:{fontSize:25,color:colors.blue,marginRight:8},searchInput:{flex:1,fontSize:13,color:colors.text},content:{paddingHorizontal:18,paddingTop:22,paddingBottom:28},headingRow:{flexDirection:'row',justifyContent:'space-between',alignItems:'center'},sectionTitle:{fontSize:18,fontWeight:'800',color:colors.navy,marginBottom:12},count:{fontSize:12,color:colors.muted,marginBottom:12},filters:{gap:8,paddingBottom:17},refresh:{alignSelf:'flex-start',paddingVertical:7,paddingHorizontal:10,borderRadius:8,backgroundColor:'#EAF3FC',marginBottom:8},refreshText:{fontSize:10,fontWeight:'800',color:'#1565C0'},filterInput:{minWidth:100,height:38,borderWidth:1,borderColor:'#D9E2EC',borderRadius:8,paddingHorizontal:9,fontSize:10,backgroundColor:'#FFFFFF',color:'#102A43'},filter:{paddingHorizontal:15,paddingVertical:9,borderRadius:22,backgroundColor:'#FFFFFF',borderWidth:1,borderColor:colors.border},filterActive:{backgroundColor:colors.blue,borderColor:colors.blue},filterText:{fontSize:12,fontWeight:'700',color:colors.muted},filterTextActive:{color:'#FFFFFF'},card:{backgroundColor:'#FFFFFF',borderRadius:17,overflow:'hidden',marginBottom:16,borderWidth:1,borderColor:colors.border},photo:{height:190,width:'100%',backgroundColor:'#DCE5ED'},verified:{position:'absolute',top:12,left:12,backgroundColor:'#E7F6EF',paddingHorizontal:10,paddingVertical:6,borderRadius:20},verifiedText:{fontSize:10,fontWeight:'800',color:colors.green},heart:{position:'absolute',right:12,top:12,width:36,height:36,borderRadius:18,backgroundColor:'#FFFFFF',alignItems:'center',justifyContent:'center'},heartText:{fontSize:22,color:colors.danger},cardBody:{padding:15},price:{fontSize:17,fontWeight:'800',color:colors.blue},perMonth:{fontSize:11,fontWeight:'500',color:colors.muted},propertyTitle:{fontSize:15,fontWeight:'800',color:colors.navy,marginTop:7},location:{fontSize:12,color:colors.muted,marginTop:6},metaRow:{flexDirection:'row',gap:8,marginTop:12,flexWrap:'wrap'},meta:{fontSize:10,fontWeight:'700',color:'#52677D',backgroundColor:'#F2F5F8',paddingHorizontal:9,paddingVertical:6,borderRadius:7},empty:{padding:25,alignItems:'center'},emptyTitle:{fontSize:16,fontWeight:'800',color:colors.navy,marginBottom:7},tabBar:{backgroundColor:'#FFFFFF',borderTopWidth:1,borderTopColor:colors.border,paddingVertical:13,paddingHorizontal:10,flexDirection:'row',justifyContent:'space-around'},tab:{fontSize:10,color:colors.muted,fontWeight:'700'},tabActive:{fontSize:10,color:colors.blue,fontWeight:'800'},back:{padding:18},backText:{fontSize:14,color:colors.blue,fontWeight:'800'},detailPhoto:{width:'100%',height:260,backgroundColor:'#DCE5ED'},detailBody:{padding:20},detailTitle:{fontSize:23,fontWeight:'800',color:colors.navy,marginTop:8},description:{fontSize:13,lineHeight:21,color:'#52677D',marginBottom:10},apiNotice:{fontSize:11,color:colors.muted,marginBottom:12},primaryButton:{height:52,backgroundColor:colors.blue,borderRadius:13,alignItems:'center',justifyContent:'center',marginTop:18},primaryButtonText:{fontSize:14,fontWeight:'800',color:'#FFFFFF'}
 });

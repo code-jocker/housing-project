@@ -8,6 +8,7 @@ import { env } from '../../config/env.js';
 import { authenticate } from '../../middleware/auth.js';
 import { asyncHandler } from '../../utils/async-handler.js';
 import { createAndSendPhoneOtp, verifyPhoneOtpHash } from './otp.service.js';
+import { deletePrivateVerificationObject, isPrivateStorageConfigured } from '../verification/private-storage.service.js';
 
 export const authRouter = Router();
 const registerSchema = z.object({
@@ -98,6 +99,79 @@ authRouter.post('/password-reset/confirm', asyncHandler(async (req, res) => {
     prisma.phoneOtp.delete({ where: { phone } }),
   ]);
   res.json({ message: 'Password reset successfully. Sign in using your new password.' });
+}));
+
+authRouter.get('/account/export', authenticate, asyncHandler(async (req, res) => {
+  const userId = req.auth!.userId;
+  const [user, properties, favorites, viewings, reports, notifications, identity, propertyVerifications] = await Promise.all([
+    prisma.user.findUnique({ where: { id: userId }, select: { id: true, fullName: true, phone: true, email: true, role: true, phoneVerifiedAt: true, createdAt: true } }),
+    prisma.property.findMany({ where: { ownerId: userId }, include: { images: { select: { url: true, sortOrder: true } } }, orderBy: { createdAt: 'desc' } }),
+    prisma.favorite.findMany({ where: { userId }, include: { property: { select: { id: true, title: true, district: true, sector: true, monthlyRentRwf: true } } }, orderBy: { createdAt: 'desc' } }),
+    prisma.viewingRequest.findMany({ where: { OR: [{ tenantId: userId }, { property: { ownerId: userId } }] }, select: { id: true, preferredAt: true, message: true, status: true, createdAt: true, property: { select: { title: true, district: true, sector: true } }, tenant: { select: { fullName: true } } }, orderBy: { createdAt: 'desc' } }),
+    prisma.propertyReport.findMany({ where: { reporterId: userId }, select: { id: true, reason: true, details: true, resolved: true, createdAt: true, property: { select: { title: true, district: true, sector: true } } }, orderBy: { createdAt: 'desc' } }),
+    prisma.notification.findMany({ where: { userId }, select: { type: true, title: true, body: true, readAt: true, createdAt: true }, orderBy: { createdAt: 'desc' } }),
+    prisma.userVerification.findUnique({ where: { userId }, select: { legalName: true, documentType: true, documentLast4: true, status: true, rejectionReason: true, submittedAt: true, reviewedAt: true } }),
+    prisma.propertyVerification.findMany({ where: { ownerId: userId }, select: { propertyId: true, documentType: true, authorizationConfirmed: true, status: true, rejectionReason: true, submittedAt: true, reviewedAt: true } }),
+  ]);
+  if (!user) { res.status(404).json({ message: 'Account not found.' }); return; }
+  res.json({ exportedAt: new Date().toISOString(), user, properties, favorites, viewings, reports, notifications, verification: { identity, properties: propertyVerifications } });
+}));
+
+const accountDeletionRequestSchema = z.object({ phone: z.string().trim().regex(/^\+[1-9][0-9]{8,14}$/) });
+authRouter.post('/account-deletion/request', asyncHandler(async (req, res) => {
+  const parsed = accountDeletionRequestSchema.safeParse(req.body);
+  if (!parsed.success) { res.status(400).json({ message: 'Enter your phone number with country code.' }); return; }
+  const user = await prisma.user.findUnique({ where: { phone: parsed.data.phone }, select: { id: true, role: true } });
+  if (!user || user.role === UserRole.ADMIN) {
+    res.status(202).json({ message: 'If the account is eligible, a deletion code will be sent.' });
+    return;
+  }
+  try {
+    const result = await createAndSendPhoneOtp(parsed.data.phone, 'ACCOUNT_DELETION');
+    res.status(202).json({ message: 'If the account is eligible, a deletion code will be sent.', ...('waitSeconds' in result ? { waitSeconds: result.waitSeconds } : {}), ...('debugCode' in result ? { debugCode: result.debugCode } : {}) });
+  } catch {
+    res.status(503).json({ message: 'Account deletion verification is temporarily unavailable. Try again later.' });
+  }
+}));
+
+const accountDeletionConfirmSchema = z.object({
+  phone: z.string().trim().regex(/^\+[1-9][0-9]{8,14}$/),
+  code: z.string().regex(/^[0-9]{6}$/),
+});
+authRouter.post('/account-deletion/confirm', asyncHandler(async (req, res) => {
+  const parsed = accountDeletionConfirmSchema.safeParse(req.body);
+  if (!parsed.success) { res.status(400).json({ message: 'Enter a valid phone number and six-digit deletion code.' }); return; }
+  const { phone, code } = parsed.data;
+  const challenge = await prisma.phoneOtp.findUnique({ where: { phone } });
+  if (!challenge || challenge.purpose !== 'ACCOUNT_DELETION' || challenge.expiresAt <= new Date()) {
+    res.status(400).json({ message: 'The deletion code is invalid or expired. Request a new code.' }); return;
+  }
+  if (challenge.attempts >= 5) { res.status(429).json({ message: 'Too many incorrect attempts. Request a new code.' }); return; }
+  if (!verifyPhoneOtpHash(phone, code, challenge.codeHash, 'ACCOUNT_DELETION')) {
+    await prisma.phoneOtp.update({ where: { phone }, data: { attempts: { increment: 1 } } });
+    res.status(400).json({ message: 'Incorrect deletion code.' }); return;
+  }
+  const user = await prisma.user.findUnique({ where: { phone }, select: { id: true, role: true } });
+  if (!user || user.role === UserRole.ADMIN) { res.status(400).json({ message: 'This account cannot be deleted through self-service.' }); return; }
+  const [identityEvidence, propertyEvidence] = await Promise.all([
+    prisma.userVerification.findUnique({ where: { userId: user.id }, select: { evidenceObjectKey: true } }),
+    prisma.propertyVerification.findMany({ where: { ownerId: user.id }, select: { evidenceObjectKey: true } }),
+  ]);
+  const evidenceKeys = [identityEvidence?.evidenceObjectKey, ...propertyEvidence.map(item => item.evidenceObjectKey)].filter((key): key is string => Boolean(key));
+  if (evidenceKeys.length && !isPrivateStorageConfigured()) {
+    res.status(503).json({ message: 'Private document storage is unavailable. Account deletion cannot safely remove your verification evidence right now.' }); return;
+  }
+  try {
+    await Promise.all(evidenceKeys.map(key => deletePrivateVerificationObject(key)));
+  } catch {
+    res.status(503).json({ message: 'Private verification evidence could not be deleted. Your account has not been removed; try again later.' }); return;
+  }
+  await prisma.$transaction([
+    prisma.auditLog.create({ data: { actorId: user.id, action: 'ACCOUNT_DELETED', entityType: 'User', entityId: user.id, details: 'Self-service deletion confirmed by phone OTP.' } }),
+    prisma.user.delete({ where: { id: user.id } }),
+    prisma.phoneOtp.delete({ where: { phone } }),
+  ]);
+  res.json({ message: 'Your account and associated marketplace records have been deleted.' });
 }));
 
 const otpRequestSchema = z.object({ phone: z.string().trim().regex(/^\+[1-9][0-9]{8,14}$/) });
