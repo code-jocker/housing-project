@@ -18,7 +18,7 @@ app.use(helmet());
 const allowedOrigins = env.CLIENT_ORIGIN.split(',').map(value => value.trim()).filter(Boolean);
 app.use(cors({
   // Native mobile clients normally omit Origin; browser clients must match the allowlist.
-  origin: (origin, callback) => callback(null, !origin || allowedOrigins.includes(origin)),
+  origin: (origin, callback) => callback(null, !origin || allowedOrigins.includes('*') || allowedOrigins.includes(origin)),
 }));
 app.use(express.json({ limit: '1mb' }));
 app.use(rateLimit({ windowMs: 15 * 60 * 1000, limit: 200, standardHeaders: 'draft-8', legacyHeaders: false }));
