@@ -30,6 +30,15 @@ Expo + React Native + TypeScript application for Android and iOS.
 - Account settings for personal-data export and phone-OTP-confirmed account deletion.
 - In-app notifications.
 
+## EAS environment variables
+
+Before creating preview or production builds, add these variables in the Expo dashboard under the matching EAS environments:
+
+- `EXPO_PUBLIC_API_URL`: the deployed backend HTTPS base URL, for example `https://your-api.onrender.com` (do not include `/api/v1`; the client appends API paths).
+- `EXPO_PUBLIC_DEMO_MODE=false`: always disable demo listings for preview and production.
+
+These values are bundled into the mobile app and are not secrets. Never put database passwords, JWT secrets, SMS keys, Cloudinary secrets or private storage keys in `EXPO_PUBLIC_*` variables.
+
 ## Android release builds
 
 Install and sign in to EAS CLI:
