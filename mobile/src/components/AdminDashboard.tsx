@@ -100,6 +100,7 @@ export function AdminDashboard({ onClose }: Props) {
       {propertyChecks.map(item=><View key={item.id} style={styles.card}>
         <Text style={styles.cardTitle}>{item.property.title}</Text><Text style={styles.meta}>{item.property.district}, {item.property.sector} · {item.documentType.replaceAll('_',' ')}</Text>
         <Text style={styles.owner}>Submitted by {item.owner.fullName} · {item.owner.phone}</Text>
+        <Text style={styles.meta}>Owner identity: {item.owner.identityVerification?.status || 'NOT SUBMITTED'}</Text>
         <Text style={styles.caution}>Approval requires the owner's identity verification to be approved first. Document review does not replace an in-person or independent check when risk is high.</Text>
         <Pressable disabled={busy} onPress={()=>openVerificationDocument('property',item.id)} style={styles.resolve}><Text style={styles.resolveText}>Open private property document</Text></Pressable>
         <TextInput value={reasons[item.id]||''} onChangeText={value=>setReasons(current=>({...current,[item.id]:value}))} placeholder="Reason required if rejecting" style={styles.input}/>
