@@ -32,12 +32,43 @@ propertiesRouter.get('/', asyncHandler(async (req, res) => {
   const minRent = req.query.minRent ? Number(req.query.minRent) : undefined;
   const maxRent = req.query.maxRent ? Number(req.query.maxRent) : undefined;
   const bedrooms = req.query.bedrooms ? Number(req.query.bedrooms) : undefined;
+  const search = typeof req.query.q === 'string' ? req.query.q.trim() : '';
+  const verifiedOnly = req.query.verified === 'true';
+
+  if (search.length === 1 || search.length > 100) {
+    res.status(400).json({ message: 'Search text must contain 2–100 characters.' });
+    return;
+  }
+  if (minRent !== undefined && (!Number.isFinite(minRent) || minRent < 0)) {
+    res.status(400).json({ message: 'Minimum rent must be a valid non-negative amount.' });
+    return;
+  }
+  if (maxRent !== undefined && (!Number.isFinite(maxRent) || maxRent < 0)) {
+    res.status(400).json({ message: 'Maximum rent must be a valid non-negative amount.' });
+    return;
+  }
+  if (minRent !== undefined && maxRent !== undefined && minRent > maxRent) {
+    res.status(400).json({ message: 'Minimum rent cannot exceed maximum rent.' });
+    return;
+  }
+
   const where = {
     status: PropertyStatus.PUBLISHED, available: true,
     ...(typeof req.query.district === 'string' ? { district: { equals: req.query.district, mode: 'insensitive' as const } } : {}),
     ...(typeof req.query.sector === 'string' ? { sector: { equals: req.query.sector, mode: 'insensitive' as const } } : {}),
     ...(typeof req.query.type === 'string' ? { propertyType: req.query.type } : {}),
-    ...(minRent !== undefined || maxRent !== undefined ? { monthlyRentRwf: { ...(minRent !== undefined && Number.isFinite(minRent) ? { gte: minRent } : {}), ...(maxRent !== undefined && Number.isFinite(maxRent) ? { lte: maxRent } : {}) } } : {}),
+    ...(verifiedOnly ? { verifiedAt: { not: null } } : {}),
+    ...(search.length >= 2 ? {
+      OR: [
+        { title: { contains: search, mode: 'insensitive' as const } },
+        { description: { contains: search, mode: 'insensitive' as const } },
+        { district: { contains: search, mode: 'insensitive' as const } },
+        { sector: { contains: search, mode: 'insensitive' as const } },
+        { cell: { contains: search, mode: 'insensitive' as const } },
+        { address: { contains: search, mode: 'insensitive' as const } },
+      ],
+    } : {}),
+    ...(minRent !== undefined || maxRent !== undefined ? { monthlyRentRwf: { ...(minRent !== undefined ? { gte: minRent } : {}), ...(maxRent !== undefined ? { lte: maxRent } : {}) } } : {}),
     ...(bedrooms !== undefined && Number.isInteger(bedrooms) ? { bedrooms: { gte: bedrooms } } : {}),
   };
   const [items, total] = await Promise.all([
