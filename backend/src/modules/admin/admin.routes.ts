@@ -83,6 +83,7 @@ adminRouter.get('/verifications/:kind/:id/document', asyncHandler(async (req, re
     res.status(400).json({ message: 'Unknown verification document type.' }); return;
   }
   if (!objectKey) { res.status(404).json({ message: 'Verification document not found.' }); return; }
+  await recordAuditLogSafely(req.auth!.userId, 'VERIFICATION_DOCUMENT_ACCESSED', req.params.kind === 'identity' ? 'UserVerification' : 'PropertyVerification', req.params.id);
   res.json({ url: createVerificationDownloadUrl(objectKey), expiresInSeconds: 120 });
 }));
 
