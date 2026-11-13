@@ -31,4 +31,18 @@ if (!parsed.success) {
   console.error('Invalid environment configuration:', parsed.error.flatten().fieldErrors);
   process.exit(1);
 }
+if (parsed.data.NODE_ENV === 'production') {
+  if (parsed.data.CLIENT_ORIGIN === '*') {
+    console.error('Invalid production configuration: CLIENT_ORIGIN must be an explicit comma-separated HTTPS origin allowlist.');
+    process.exit(1);
+  }
+  const origins = parsed.data.CLIENT_ORIGIN.split(',').map(value => value.trim()).filter(Boolean);
+  if (origins.length === 0 || origins.some(value => {
+    try { const url = new URL(value); return url.protocol !== 'https:' || url.origin !== value; }
+    catch { return true; }
+  })) {
+    console.error('Invalid production configuration: every CLIENT_ORIGIN entry must be a valid HTTPS origin, e.g. https://housingconnect.example.com.');
+    process.exit(1);
+  }
+}
 export const env = parsed.data;
