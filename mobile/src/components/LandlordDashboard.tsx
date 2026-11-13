@@ -14,7 +14,7 @@ export function LandlordDashboard({onClose}:Props){
  useEffect(()=>{void refresh();},[refresh]);
  async function availability(item:ApiProperty,available:boolean){setBusy(true);setError('');try{await setPropertyAvailability(item.id,available);await refresh();}catch(e){setError(e instanceof Error?e.message:'Could not update property status.');}finally{setBusy(false);}}
  async function viewing(item:OwnerViewing,status:'ACCEPTED'|'DECLINED'|'COMPLETED'){setBusy(true);setError('');try{await updateViewing(item.id,status);await refresh();}catch(e){setError(e instanceof Error?e.message:'Could not update viewing.');}finally{setBusy(false);}}
- return <View style={styles.overlay}><View style={styles.panel}>
+ return <><View style={styles.overlay}><View style={styles.panel}>
   <View style={styles.header}><View><Text style={styles.title}>Landlord workspace</Text><Text style={styles.subtitle}>Manage your listings and viewing requests</Text></View><Pressable onPress={onClose}><Text style={styles.close}>✕</Text></Pressable></View>
   <ScrollView contentContainerStyle={{paddingBottom:30}}>
    {!!error&&<Text style={styles.error}>{error}</Text>}
@@ -32,6 +32,6 @@ export function LandlordDashboard({onClose}:Props){
     {item.status==='ACCEPTED'&&<Pressable disabled={busy} onPress={()=>viewing(item,'COMPLETED')} style={styles.secondary}><Text style={styles.secondaryText}>Mark viewing completed</Text></Pressable>}
    </View>)}
   </ScrollView>
- </View></View>{verificationVisible&&<VerificationCenter onClose={()=>setVerificationVisible(false)}/>};
+ </View></View>{verificationVisible&&<VerificationCenter onClose={()=>setVerificationVisible(false)}/>}</>;
 }
 const styles=StyleSheet.create({overlay:{position:'absolute',top:0,left:0,right:0,bottom:0,zIndex:30,backgroundColor:'#F3F6FA'},panel:{flex:1,paddingTop:45,paddingHorizontal:18},header:{flexDirection:'row',justifyContent:'space-between',alignItems:'center',paddingBottom:18},title:{fontSize:22,fontWeight:'900',color:'#102A43'},subtitle:{fontSize:11,color:'#718096',marginTop:3},close:{fontSize:20,color:'#718096',padding:8},refresh:{alignSelf:'flex-end',backgroundColor:'#EAF3FC',padding:9,borderRadius:8},refreshText:{fontSize:11,fontWeight:'800',color:'#1565C0'},verify:{alignSelf:'stretch',backgroundColor:'#1565C0',padding:12,borderRadius:9,marginTop:10},verifyText:{fontSize:11,fontWeight:'900',color:'#FFFFFF',textAlign:'center'},section:{fontSize:16,fontWeight:'900',color:'#102A43',marginTop:18,marginBottom:10},empty:{fontSize:12,color:'#718096',padding:12},card:{backgroundColor:'#FFFFFF',borderRadius:13,padding:14,marginBottom:11,borderWidth:1,borderColor:'#E2E8F0'},cardTitle:{fontSize:14,fontWeight:'900',color:'#102A43'},meta:{fontSize:10,color:'#627D98',marginTop:5},status:{fontSize:11,fontWeight:'800',color:'#1565C0',marginTop:8},secondary:{alignSelf:'flex-start',backgroundColor:'#EAF3FC',padding:9,borderRadius:8,marginTop:10},secondaryText:{fontSize:10,fontWeight:'800',color:'#1565C0'},buttons:{flexDirection:'row',gap:8,marginTop:10},accept:{backgroundColor:'#198754',padding:10,borderRadius:8},decline:{backgroundColor:'#C53030',padding:10,borderRadius:8},buttonText:{fontSize:10,fontWeight:'900',color:'#FFFFFF'},message:{fontSize:11,color:'#52677D',marginTop:7},error:{fontSize:12,color:'#C53030',marginBottom:10}});
