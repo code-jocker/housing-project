@@ -171,7 +171,24 @@ adminRouter.patch('/users/:id/status', asyncHandler(async (req, res) => {
   const parsed = accountSchema.safeParse(req.body);
   if (!parsed.success) { res.status(400).json({ message: 'Invalid account status.' }); return; }
   if (req.params.id === req.auth!.userId && !parsed.data.isActive) { res.status(400).json({ message: 'You cannot deactivate your own admin account.' }); return; }
-  const result = await prisma.user.updateMany({ where: { id: req.params.id, role: { not: UserRole.ADMIN } }, data: { isActive: parsed.data.isActive } });
+  const result = await prisma.$transaction(async tx => {
+    const updated = await tx.user.updateMany({
+      where: { id: req.params.id, role: { not: UserRole.ADMIN } },
+      data: { isActive: parsed.data.isActive, ...(!parsed.data.isActive ? { tokenVersion: { increment: 1 } } : {}) },
+    });
+    if (updated.count && !parsed.data.isActive) {
+      await tx.property.updateMany({ where: { ownerId: req.params.id }, data: { status: PropertyStatus.PENDING_REVIEW, verifiedAt: null } });
+      await tx.userVerification.updateMany({
+        where: { userId: req.params.id, status: VerificationStatus.APPROVED },
+        data: { status: VerificationStatus.PENDING, rejectionReason: null, reviewedAt: null, reviewedById: null, submittedAt: new Date() },
+      });
+      await tx.propertyVerification.updateMany({
+        where: { ownerId: req.params.id, status: VerificationStatus.APPROVED },
+        data: { status: VerificationStatus.PENDING, rejectionReason: null, reviewedAt: null, reviewedById: null, submittedAt: new Date() },
+      });
+    }
+    return updated;
+  });
   if (!result.count) { res.status(404).json({ message: 'Non-admin account not found.' }); return; }
   await recordAuditLogSafely(req.auth!.userId, 'USER_STATUS_CHANGED', 'User', req.params.id, JSON.stringify({ isActive: parsed.data.isActive }));
   res.json({ message: parsed.data.isActive ? 'Account activated.' : 'Account deactivated.' });
