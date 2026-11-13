@@ -61,6 +61,7 @@ propertiesRouter.get('/', asyncHandler(async (req, res) => {
     ...(search ? {
       OR: [
         { title: { contains: search, mode: 'insensitive' as const } },
+        { propertyType: { contains: search, mode: 'insensitive' as const } },
         { description: { contains: search, mode: 'insensitive' as const } },
         { district: { contains: search, mode: 'insensitive' as const } },
         { sector: { contains: search, mode: 'insensitive' as const } },
