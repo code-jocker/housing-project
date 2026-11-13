@@ -61,7 +61,7 @@ function presign(method: StorageMethod, objectKey: string, expiresSeconds: numbe
 }
 
 export function createVerificationUploadUrl(objectKey: string, contentType: string) {
-  return presign('PUT', objectKey, 60, contentType);
+  return presign('PUT', objectKey, 300, contentType);
 }
 
 export function createVerificationDownloadUrl(objectKey: string) {
