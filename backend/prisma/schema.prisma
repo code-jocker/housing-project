@@ -31,6 +31,12 @@ enum ViewingStatus {
   CANCELLED
 }
 
+enum VerificationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 model User {
   id           String           @id @default(cuid())
   fullName     String
@@ -48,6 +54,8 @@ model User {
   viewingRequests ViewingRequest[]
   reports      PropertyReport[]
   notifications Notification[]
+  identityVerification UserVerification?
+  propertyVerifications PropertyVerification[] @relation("PropertyVerificationOwner")
   @@index([role])
 }
 
@@ -80,6 +88,7 @@ model Property {
   favorites       Favorite[]
   viewingRequests ViewingRequest[]
   reports         PropertyReport[]
+  verification    PropertyVerification?
   @@index([district, sector])
   @@index([monthlyRentRwf])
   @@index([status, available])
@@ -168,4 +177,38 @@ model AuditLog {
   @@index([createdAt])
   @@index([entityType, entityId])
   @@index([actorId, createdAt])
+}
+
+
+model UserVerification {
+  id                String             @id @default(cuid())
+  userId            String             @unique
+  user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  legalName         String
+  documentType      String
+  documentLast4     String
+  evidenceObjectKey String
+  status            VerificationStatus @default(PENDING)
+  rejectionReason   String?
+  submittedAt       DateTime           @default(now())
+  reviewedAt        DateTime?
+  reviewedById      String?
+  @@index([status, submittedAt])
+}
+
+model PropertyVerification {
+  id                    String             @id @default(cuid())
+  propertyId            String             @unique
+  property              Property           @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  ownerId               String
+  owner                 User               @relation("PropertyVerificationOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  documentType          String
+  evidenceObjectKey     String
+  authorizationConfirmed Boolean          @default(false)
+  status                VerificationStatus @default(PENDING)
+  rejectionReason       String?
+  submittedAt           DateTime           @default(now())
+  reviewedAt            DateTime?
+  reviewedById          String?
+  @@index([status, submittedAt])
 }
