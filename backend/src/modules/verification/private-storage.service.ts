@@ -1,7 +1,7 @@
 import { createHash, createHmac } from 'node:crypto';
 import { env } from '../../config/env.js';
 
-type StorageMethod = 'PUT' | 'GET' | 'HEAD';
+type StorageMethod = 'PUT' | 'GET' | 'HEAD' | 'DELETE';
 
 function storageConfig() {
   const { PRIVATE_STORAGE_ENDPOINT, PRIVATE_STORAGE_REGION, PRIVATE_STORAGE_BUCKET, PRIVATE_STORAGE_ACCESS_KEY_ID, PRIVATE_STORAGE_SECRET_ACCESS_KEY } = env;
@@ -81,4 +81,13 @@ export async function inspectVerificationObject(objectKey: string) {
 
 export function isPrivateStorageConfigured() {
   return Boolean(env.PRIVATE_STORAGE_ENDPOINT && env.PRIVATE_STORAGE_REGION && env.PRIVATE_STORAGE_BUCKET && env.PRIVATE_STORAGE_ACCESS_KEY_ID && env.PRIVATE_STORAGE_SECRET_ACCESS_KEY);
+}
+
+
+export async function deletePrivateVerificationObject(objectKey: string) {
+  const url = presign('DELETE', objectKey, 60);
+  const response = await fetch(url, { method: 'DELETE' });
+  if (!response.ok && response.status !== 404) {
+    throw new Error('Private verification document deletion failed.');
+  }
 }
