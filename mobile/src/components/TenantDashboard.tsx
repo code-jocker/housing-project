@@ -12,7 +12,7 @@ export function TenantDashboard({onClose,phone,onDeleted}:Props){
  return <><View style={styles.overlay}><View style={styles.panel}><View style={styles.header}><View><Text style={styles.title}>My viewing requests</Text><Text style={styles.subtitle}>Track appointments with property owners</Text></View><Pressable onPress={onClose}><Text style={styles.close}>✕</Text></Pressable></View>
   <ScrollView contentContainerStyle={{paddingBottom:30}}>
    <Pressable onPress={refresh} style={styles.refresh}><Text style={styles.refreshText}>Refresh</Text></Pressable>
-   <Pressable onPress={()=>setDeletionVisible(true)} style={styles.deleteAccount}><Text style={styles.deleteAccountText}>Delete my account</Text></Pressable>
+   <Pressable onPress={()=>setDeletionVisible(true)} style={styles.deleteAccount}><Text style={styles.deleteAccountText}>Account settings & privacy</Text></Pressable>
    {!!error&&<Text style={styles.error}>{error}</Text>}
    {items.length===0&&<Text style={styles.empty}>You have not requested a viewing yet.</Text>}
    {items.map(item=><View key={item.id} style={styles.card}><Text style={styles.cardTitle}>{item.property.title}</Text><Text style={styles.meta}>{item.property.district}, {item.property.sector}</Text><Text style={styles.meta}>Preferred: {new Date(item.preferredAt).toLocaleString()}</Text><Text style={styles.status}>Status: {item.status}</Text>
