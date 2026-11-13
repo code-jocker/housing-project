@@ -3,7 +3,7 @@ import { SafeAreaView, View, Text, TextInput, ScrollView, Image, Pressable, Styl
 import { StatusBar as ExpoStatusBar } from 'expo-status-bar';
 import { properties, Property } from './src/data/properties';
 import { colors } from './src/theme';
-import { addFavorite, AuthUser, getFavorites, getProperties, getSession, logout, removeFavorite, reportProperty } from './src/services/api';
+import { addFavorite, AuthUser, getFavorites, getProperties, getPropertiesPage, getSession, logout, removeFavorite, reportProperty } from './src/services/api';
 import { AuthScreen } from './src/components/AuthScreen';
 import { ViewingRequestForm } from './src/components/ViewingRequestForm';
 import { CreateListingForm } from './src/components/CreateListingForm';
@@ -43,6 +43,9 @@ export default function App() {
   const [listingData, setListingData] = useState<Property[]>(demoMode ? properties : []);
   const [loadingListings, setLoadingListings] = useState(true);
   const [apiMessage, setApiMessage] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [user, setUser] = useState<AuthUser | null>(null);
   const [authVisible, setAuthVisible] = useState(false);
   const [viewingVisible, setViewingVisible] = useState(false);
@@ -57,12 +60,16 @@ export default function App() {
     let active = true;
     const timer = setTimeout(() => {
       setLoadingListings(true);
-      getProperties({
+      setCurrentPage(1);
+      getPropertiesPage({
         q: query.trim().length >= 2 ? query.trim() : undefined,
         type: filter !== 'All' && filter !== 'Verified' ? filter : undefined,
         verified: filter === 'Verified',
-      }).then(items => {
+        page: 1,
+      }).then(result => {
         if (!active) return;
+        const items = result.data;
+        setTotalPages(result.pagination.pages);
         if (items.length > 0) setListingData(items.map(item => ({ id: item.id, title: item.title, district: item.district, sector: item.sector, rent: item.monthlyRentRwf, bedrooms: item.bedrooms, bathrooms: item.bathrooms, type: item.propertyType as Property['type'], image: item.images[0]?.url || properties[0].image, verified: Boolean(item.verifiedAt), available: item.available, furnished: item.furnished, description: item.description })));
         else setListingData(demoMode ? properties : []);
         setApiMessage(items.length ? 'Live listings' : demoMode ? 'Demo listings — not real rental offers.' : 'No published properties match these filters.');
@@ -87,6 +94,26 @@ export default function App() {
     setSaved(current => alreadySaved ? current.filter(x => x !== id) : [...current, id]);
     try { if (alreadySaved) await removeFavorite(id); else await addFavorite(id); }
     catch (error) { setSaved(current => alreadySaved ? [...current, id] : current.filter(x => x !== id)); setApiMessage(error instanceof Error ? error.message : 'Could not update saved properties.'); }
+  };
+  const loadMoreListings = async () => {
+    if (loadingMore || currentPage >= totalPages) return;
+    setLoadingMore(true);
+    try {
+      const nextPage = currentPage + 1;
+      const result = await getPropertiesPage({
+        q: query.trim().length >= 2 ? query.trim() : undefined,
+        type: filter !== 'All' && filter !== 'Verified' ? filter : undefined,
+        verified: filter === 'Verified',
+        page: nextPage,
+      });
+      const mapped = result.data.map(item => ({ id: item.id, title: item.title, district: item.district, sector: item.sector, rent: item.monthlyRentRwf, bedrooms: item.bedrooms, bathrooms: item.bathrooms, type: item.propertyType as Property['type'], image: item.images[0]?.url || properties[0].image, verified: Boolean(item.verifiedAt), available: item.available, furnished: item.furnished, description: item.description }));
+      setListingData(current => [...current.filter(existing => !mapped.some(item => item.id === existing.id)), ...mapped]);
+      setCurrentPage(nextPage);
+    } catch (error) {
+      setApiMessage(error instanceof Error ? error.message : 'Could not load more listings.');
+    } finally {
+      setLoadingMore(false);
+    }
   };
   const onAuthenticated = async (account: AuthUser) => { setUser(account); setAuthVisible(false); try { const items = await getFavorites(); setSaved(items.map(item => item.id)); } catch { setSaved([]); } };
   const onLogout = async () => { await logout(); setUser(null); setSaved([]); setAuthVisible(false); };
@@ -131,6 +158,7 @@ export default function App() {
         {loadingListings && <Text style={styles.apiNotice}>Checking for new listings…</Text>}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filters}>{['All', 'Verified', 'Apartment', 'House', 'Studio'].map(option => <Pressable key={option} onPress={() => setFilter(option)} style={[styles.filter, filter === option && styles.filterActive]}><Text style={[styles.filterText, filter === option && styles.filterTextActive]}>{option}</Text></Pressable>)}</ScrollView>
         {filtered.map(item => <PropertyCard key={item.id} item={item} saved={saved.includes(item.id)} onSave={() => toggleSave(item.id)} onOpen={() => setSelected(item)} />)}
+        {!showSaved && currentPage < totalPages && <Pressable disabled={loadingMore} onPress={loadMoreListings} style={styles.primaryButton}><Text style={styles.primaryButtonText}>{loadingMore ? 'Loading…' : 'Load more properties'}</Text></Pressable>}
         {filtered.length === 0 && <View style={styles.empty}><Text style={styles.emptyTitle}>No properties found</Text><Text style={styles.description}>Try another district, sector or property type.</Text></View>}
       </View>
     </ScrollView><View style={styles.tabBar}><Pressable onPress={() => setShowSaved(false)}><Text style={!showSaved ? styles.tabActive : styles.tab}>⌂  Explore</Text></Pressable><Pressable onPress={() => { if (!user) setAuthVisible(true); else setShowSaved(true); }}><Text style={showSaved ? styles.tabActive : styles.tab}>♡  Saved ({saved.length})</Text></Pressable><Pressable onPress={() => user ? setNotificationsVisible(true) : setAuthVisible(true)}><Text style={styles.tab}>♢ Alerts</Text></Pressable><Pressable onPress={() => { if (!user) setAuthVisible(true); else if (user.role === 'LANDLORD' || user.role === 'AGENT') setListingVisible(true); else Alert.alert('Landlord account required', 'Use a landlord or agent account to publish a property.'); }}><Text style={styles.tab}>＋  List a home</Text></Pressable><Pressable onPress={() => user?.role === 'ADMIN' ? setAdminVisible(true) : user?.role === 'LANDLORD' || user?.role === 'AGENT' ? setLandlordVisible(true) : user ? onLogout() : setAuthVisible(true)}><Text style={styles.tab}>{user?.role === 'ADMIN' ? 'Admin' : user?.role === 'LANDLORD' || user?.role === 'AGENT' ? 'My listings' : user?.role === 'TENANT' ? 'My requests' : user ? '↪ Sign out' : '☻ Profile'}</Text></Pressable></View></SafeAreaView>
