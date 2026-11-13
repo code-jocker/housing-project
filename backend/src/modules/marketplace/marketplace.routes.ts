@@ -77,7 +77,7 @@ marketplaceRouter.get('/viewings', asyncHandler(async (req, res) => {
     orderBy: { createdAt: 'desc' },
   });
   const safeData = data.map(item => {
-    if (req.auth!.role === UserRole.ADMIN || [ViewingStatus.ACCEPTED, ViewingStatus.COMPLETED].includes(item.status)) return item;
+    if (req.auth!.role === UserRole.ADMIN || item.status === ViewingStatus.ACCEPTED || item.status === ViewingStatus.COMPLETED) return item;
     if (req.auth!.role === UserRole.TENANT) {
       return { ...item, property: { ...item.property, owner: { ...item.property.owner, phone: '' } } };
     }
