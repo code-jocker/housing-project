@@ -27,38 +27,38 @@ const propertySchema = z.object({
 });
 
 propertiesRouter.get('/', asyncHandler(async (req, res) => {
-  const page = Math.max(1, Number(req.query.page) || 1);
-  const limit = Math.min(50, Math.max(1, Number(req.query.limit) || 20));
-  const minRent = req.query.minRent ? Number(req.query.minRent) : undefined;
-  const maxRent = req.query.maxRent ? Number(req.query.maxRent) : undefined;
-  const bedrooms = req.query.bedrooms ? Number(req.query.bedrooms) : undefined;
-  const search = typeof req.query.q === 'string' ? req.query.q.trim() : '';
-  const verifiedOnly = req.query.verified === 'true';
+  const querySchema = z.object({
+    page: z.coerce.number().int().min(1).max(100000).default(1),
+    limit: z.coerce.number().int().min(1).max(50).default(20),
+    minRent: z.coerce.number().int().min(0).optional(),
+    maxRent: z.coerce.number().int().min(0).optional(),
+    bedrooms: z.coerce.number().int().min(0).max(30).optional(),
+    q: z.string().trim().min(2).max(100).optional(),
+    district: z.string().trim().min(2).max(80).optional(),
+    sector: z.string().trim().min(2).max(80).optional(),
+    type: z.enum(['Apartment', 'House', 'Studio', 'Room', 'Commercial']).optional(),
+    verified: z.enum(['true', 'false']).optional(),
+  }).safeParse(req.query);
 
-  if (search.length === 1 || search.length > 100) {
-    res.status(400).json({ message: 'Search text must contain 2–100 characters.' });
+  if (!querySchema.success) {
+    res.status(400).json({ message: 'Invalid property search filters.', errors: querySchema.error.flatten() });
     return;
   }
-  if (minRent !== undefined && (!Number.isFinite(minRent) || minRent < 0)) {
-    res.status(400).json({ message: 'Minimum rent must be a valid non-negative amount.' });
-    return;
-  }
-  if (maxRent !== undefined && (!Number.isFinite(maxRent) || maxRent < 0)) {
-    res.status(400).json({ message: 'Maximum rent must be a valid non-negative amount.' });
-    return;
-  }
+
+  const { page, limit, minRent, maxRent, bedrooms, q: search, district, sector, type, verified } = querySchema.data;
   if (minRent !== undefined && maxRent !== undefined && minRent > maxRent) {
     res.status(400).json({ message: 'Minimum rent cannot exceed maximum rent.' });
     return;
   }
 
   const where = {
-    status: PropertyStatus.PUBLISHED, available: true,
-    ...(typeof req.query.district === 'string' ? { district: { equals: req.query.district, mode: 'insensitive' as const } } : {}),
-    ...(typeof req.query.sector === 'string' ? { sector: { equals: req.query.sector, mode: 'insensitive' as const } } : {}),
-    ...(typeof req.query.type === 'string' ? { propertyType: req.query.type } : {}),
-    ...(verifiedOnly ? { verifiedAt: { not: null } } : {}),
-    ...(search.length >= 2 ? {
+    status: PropertyStatus.PUBLISHED,
+    available: true,
+    ...(district ? { district: { equals: district, mode: 'insensitive' as const } } : {}),
+    ...(sector ? { sector: { equals: sector, mode: 'insensitive' as const } } : {}),
+    ...(type ? { propertyType: type } : {}),
+    ...(verified === 'true' ? { verifiedAt: { not: null } } : {}),
+    ...(search ? {
       OR: [
         { title: { contains: search, mode: 'insensitive' as const } },
         { description: { contains: search, mode: 'insensitive' as const } },
@@ -69,7 +69,7 @@ propertiesRouter.get('/', asyncHandler(async (req, res) => {
       ],
     } : {}),
     ...(minRent !== undefined || maxRent !== undefined ? { monthlyRentRwf: { ...(minRent !== undefined ? { gte: minRent } : {}), ...(maxRent !== undefined ? { lte: maxRent } : {}) } } : {}),
-    ...(bedrooms !== undefined && Number.isInteger(bedrooms) ? { bedrooms: { gte: bedrooms } } : {}),
+    ...(bedrooms !== undefined ? { bedrooms: { gte: bedrooms } } : {}),
   };
   const [items, total] = await Promise.all([
     prisma.property.findMany({ where, include: { images: { orderBy: { sortOrder: 'asc' } }, owner: { select: { id: true, fullName: true, role: true } } }, orderBy: { createdAt: 'desc' }, skip: (page - 1) * limit, take: limit }),
@@ -113,7 +113,7 @@ propertiesRouter.patch('/:id', authenticate, allowRoles(UserRole.LANDLORD, UserR
   const parsed = propertySchema.partial().safeParse(req.body);
   if (!parsed.success) { res.status(400).json({ message: 'Invalid property details.', errors: parsed.error.flatten() }); return; }
   const { images, ...data } = parsed.data;
-  const updated = await prisma.property.update({ where: { id: current.id }, data: { ...data, status: req.auth!.role === UserRole.ADMIN ? current.status : PropertyStatus.PENDING_REVIEW, ...(images ? { images: { deleteMany: {}, create: images.map((url, sortOrder) => ({ url, sortOrder })) } } : {}) }, include: { images: true } });
+  const updated = await prisma.property.update({ where: { id: current.id }, data: { ...data, status: req.auth!.role === UserRole.ADMIN ? current.status : PropertyStatus.PENDING_REVIEW, ...(req.auth!.role === UserRole.ADMIN ? {} : { verifiedAt: null }), ...(images ? { images: { deleteMany: {}, create: images.map((url, sortOrder) => ({ url, sortOrder })) } } : {}) }, include: { images: true } });
   await recordAuditLogSafely(req.auth!.userId, 'PROPERTY_UPDATED', 'Property', current.id);
   res.json({ message: 'Property updated. Changes are pending review.', data: updated });
 }));
