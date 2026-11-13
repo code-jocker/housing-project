@@ -68,7 +68,7 @@ export default function App() {
       if (showSaved) {
         getFavorites().then(items => {
           if (!active) return;
-          setListingData(items.map(item => ({ id: item.id, title: item.title, district: item.district, sector: item.sector, rent: item.monthlyRentRwf, bedrooms: item.bedrooms, bathrooms: item.bathrooms, type: item.propertyType as Property['type'], image: item.images[0]?.url || properties[0].image, verified: Boolean(item.verifiedAt), available: item.available, furnished: item.furnished, description: item.description })));
+          setListingData(items.map(item => ({ id: item.id, title: item.title, district: item.district, sector: item.sector, cell: item.cell, address: item.address, rent: item.monthlyRentRwf, bedrooms: item.bedrooms, bathrooms: item.bathrooms, type: item.propertyType as Property['type'], image: item.images[0]?.url || properties[0].image, verified: Boolean(item.verifiedAt), available: item.available, furnished: item.furnished, description: item.description })));
           setTotalPages(1);
           setApiMessage('Your saved properties');
         }).catch(error => {
@@ -101,7 +101,7 @@ export default function App() {
         if (!active) return;
         const items = result.data;
         setTotalPages(result.pagination.pages);
-        if (items.length > 0) setListingData(items.map(item => ({ id: item.id, title: item.title, district: item.district, sector: item.sector, rent: item.monthlyRentRwf, bedrooms: item.bedrooms, bathrooms: item.bathrooms, type: item.propertyType as Property['type'], image: item.images[0]?.url || properties[0].image, verified: Boolean(item.verifiedAt), available: item.available, furnished: item.furnished, description: item.description })));
+        if (items.length > 0) setListingData(items.map(item => ({ id: item.id, title: item.title, district: item.district, sector: item.sector, cell: item.cell, address: item.address, rent: item.monthlyRentRwf, bedrooms: item.bedrooms, bathrooms: item.bathrooms, type: item.propertyType as Property['type'], image: item.images[0]?.url || properties[0].image, verified: Boolean(item.verifiedAt), available: item.available, furnished: item.furnished, description: item.description })));
         else setListingData(demoMode ? properties : []);
         setApiMessage(items.length ? 'Live listings' : demoMode ? 'Demo listings — not real rental offers.' : 'No published properties match these filters.');
       }).catch(() => {
@@ -145,7 +145,7 @@ export default function App() {
         bedrooms: bedroomsText.trim() ? Number(bedroomsText) : undefined,
         page: nextPage,
       });
-      const mapped = result.data.map(item => ({ id: item.id, title: item.title, district: item.district, sector: item.sector, rent: item.monthlyRentRwf, bedrooms: item.bedrooms, bathrooms: item.bathrooms, type: item.propertyType as Property['type'], image: item.images[0]?.url || properties[0].image, verified: Boolean(item.verifiedAt), available: item.available, furnished: item.furnished, description: item.description }));
+      const mapped = result.data.map(item => ({ id: item.id, title: item.title, district: item.district, sector: item.sector, cell: item.cell, address: item.address, rent: item.monthlyRentRwf, bedrooms: item.bedrooms, bathrooms: item.bathrooms, type: item.propertyType as Property['type'], image: item.images[0]?.url || properties[0].image, verified: Boolean(item.verifiedAt), available: item.available, furnished: item.furnished, description: item.description }));
       setListingData(current => [...current.filter(existing => !mapped.some(item => item.id === existing.id)), ...mapped]);
       setCurrentPage(nextPage);
     } catch (error) {
@@ -216,7 +216,7 @@ export default function App() {
     {landlordVisible && <LandlordDashboard phone={user?.phone || ''} onDeleted={async () => { setLandlordVisible(false); await onLogout(); }} onClose={() => setLandlordVisible(false)} />}
     {tenantVisible && <TenantDashboard phone={user?.phone || ''} onDeleted={async () => { setTenantVisible(false); await onLogout(); }} onClose={() => setTenantVisible(false)} />}
     {notificationsVisible && <NotificationsScreen onClose={() => setNotificationsVisible(false)} />}
-    {listingVisible && <CreateListingForm onClose={() => setListingVisible(false)} onCreated={async () => { setListingVisible(false); Alert.alert('Listing submitted', 'Your property is pending platform review.'); try { const items = await getProperties(); if (items.length) setListingData(items.map(item => ({ id: item.id, title: item.title, district: item.district, sector: item.sector, rent: item.monthlyRentRwf, bedrooms: item.bedrooms, bathrooms: item.bathrooms, type: item.propertyType as Property['type'], image: item.images[0]?.url || properties[0].image, verified: Boolean(item.verifiedAt), available: item.available, furnished: item.furnished, description: item.description }))); } catch { /* Refresh can be retried when the feed reloads. */ } }} />}
+    {listingVisible && <CreateListingForm onClose={() => setListingVisible(false)} onCreated={async () => { setListingVisible(false); Alert.alert('Listing submitted', 'Your property is pending platform review.'); try { const items = await getProperties(); if (items.length) setListingData(items.map(item => ({ id: item.id, title: item.title, district: item.district, sector: item.sector, cell: item.cell, address: item.address, rent: item.monthlyRentRwf, bedrooms: item.bedrooms, bathrooms: item.bathrooms, type: item.propertyType as Property['type'], image: item.images[0]?.url || properties[0].image, verified: Boolean(item.verifiedAt), available: item.available, furnished: item.furnished, description: item.description }))); } catch { /* Refresh can be retried when the feed reloads. */ } }} />}
     </>
   );
 }
