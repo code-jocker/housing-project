@@ -25,7 +25,7 @@ verificationRouter.post('/documents/upload-url', asyncHandler(async (req, res) =
   const extension = parsed.data.contentType === 'application/pdf' ? 'pdf' : parsed.data.contentType === 'image/png' ? 'png' : 'jpg';
   const objectKey = `verification/${req.auth!.userId}/${parsed.data.purpose.toLowerCase()}/${randomUUID()}.${extension}`;
   const uploadUrl = createVerificationUploadUrl(objectKey, parsed.data.contentType);
-  res.json({ uploadUrl, objectKey, method: 'PUT', expiresInSeconds: 300, requiredHeaders: { 'Content-Type': parsed.data.contentType }, maximumSizeBytes: 10 * 1024 * 1024 });
+  res.json({ uploadUrl, objectKey, method: 'PUT', expiresInSeconds: 60, requiredHeaders: { 'Content-Type': parsed.data.contentType }, maximumAcceptedSizeBytes: 10 * 1024 * 1024 });
 }));
 
 verificationRouter.get('/me', asyncHandler(async (req, res) => {
