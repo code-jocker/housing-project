@@ -248,3 +248,11 @@ export async function reviewIdentityVerification(id: string, decision: 'APPROVED
 export async function reviewPropertyVerification(id: string, decision: 'APPROVED' | 'REJECTED', reason?: string) {
   return request('/api/v1/admin/verifications/properties/' + encodeURIComponent(id), { method: 'PATCH', body: JSON.stringify({ decision, ...(reason ? { reason } : {}) }) });
 }
+
+
+export async function requestAccountDeletion(phone: string): Promise<{ message: string; debugCode?: string; waitSeconds?: number }> {
+  return request('/api/v1/auth/account-deletion/request', { method: 'POST', body: JSON.stringify({ phone }) }, false);
+}
+export async function confirmAccountDeletion(phone: string, code: string): Promise<void> {
+  await request('/api/v1/auth/account-deletion/confirm', { method: 'POST', body: JSON.stringify({ phone, code }) }, false);
+}
