@@ -101,6 +101,22 @@ authRouter.post('/password-reset/confirm', asyncHandler(async (req, res) => {
   res.json({ message: 'Password reset successfully. Sign in using your new password.' });
 }));
 
+authRouter.get('/account/export', authenticate, asyncHandler(async (req, res) => {
+  const userId = req.auth!.userId;
+  const [user, properties, favorites, viewings, reports, notifications, identity, propertyVerifications] = await Promise.all([
+    prisma.user.findUnique({ where: { id: userId }, select: { id: true, fullName: true, phone: true, email: true, role: true, phoneVerifiedAt: true, createdAt: true } }),
+    prisma.property.findMany({ where: { ownerId: userId }, include: { images: { select: { url: true, sortOrder: true } } }, orderBy: { createdAt: 'desc' } }),
+    prisma.favorite.findMany({ where: { userId }, include: { property: { select: { id: true, title: true, district: true, sector: true, monthlyRentRwf: true } } }, orderBy: { createdAt: 'desc' } }),
+    prisma.viewingRequest.findMany({ where: { OR: [{ tenantId: userId }, { property: { ownerId: userId } }] }, select: { id: true, preferredAt: true, message: true, status: true, createdAt: true, property: { select: { title: true, district: true, sector: true } }, tenant: { select: { fullName: true } } }, orderBy: { createdAt: 'desc' } }),
+    prisma.propertyReport.findMany({ where: { reporterId: userId }, select: { id: true, reason: true, details: true, resolved: true, createdAt: true, property: { select: { title: true, district: true, sector: true } } }, orderBy: { createdAt: 'desc' } }),
+    prisma.notification.findMany({ where: { userId }, select: { type: true, title: true, body: true, readAt: true, createdAt: true }, orderBy: { createdAt: 'desc' } }),
+    prisma.userVerification.findUnique({ where: { userId }, select: { legalName: true, documentType: true, documentLast4: true, status: true, rejectionReason: true, submittedAt: true, reviewedAt: true } }),
+    prisma.propertyVerification.findMany({ where: { ownerId: userId }, select: { propertyId: true, documentType: true, authorizationConfirmed: true, status: true, rejectionReason: true, submittedAt: true, reviewedAt: true } }),
+  ]);
+  if (!user) { res.status(404).json({ message: 'Account not found.' }); return; }
+  res.json({ exportedAt: new Date().toISOString(), user, properties, favorites, viewings, reports, notifications, verification: { identity, properties: propertyVerifications } });
+}));
+
 const accountDeletionRequestSchema = z.object({ phone: z.string().trim().regex(/^\+[1-9][0-9]{8,14}$/) });
 authRouter.post('/account-deletion/request', asyncHandler(async (req, res) => {
   const parsed = accountDeletionRequestSchema.safeParse(req.body);
