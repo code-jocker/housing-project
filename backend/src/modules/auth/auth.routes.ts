@@ -8,6 +8,7 @@ import { env } from '../../config/env.js';
 import { authenticate } from '../../middleware/auth.js';
 import { asyncHandler } from '../../utils/async-handler.js';
 import { createAndSendPhoneOtp, verifyPhoneOtpHash } from './otp.service.js';
+import { deletePrivateVerificationObject, isPrivateStorageConfigured } from '../verification/private-storage.service.js';
 
 export const authRouter = Router();
 const registerSchema = z.object({
@@ -136,6 +137,19 @@ authRouter.post('/account-deletion/confirm', asyncHandler(async (req, res) => {
   }
   const user = await prisma.user.findUnique({ where: { phone }, select: { id: true, role: true } });
   if (!user || user.role === UserRole.ADMIN) { res.status(400).json({ message: 'This account cannot be deleted through self-service.' }); return; }
+  const [identityEvidence, propertyEvidence] = await Promise.all([
+    prisma.userVerification.findUnique({ where: { userId: user.id }, select: { evidenceObjectKey: true } }),
+    prisma.propertyVerification.findMany({ where: { ownerId: user.id }, select: { evidenceObjectKey: true } }),
+  ]);
+  const evidenceKeys = [identityEvidence?.evidenceObjectKey, ...propertyEvidence.map(item => item.evidenceObjectKey)].filter((key): key is string => Boolean(key));
+  if (evidenceKeys.length && !isPrivateStorageConfigured()) {
+    res.status(503).json({ message: 'Private document storage is unavailable. Account deletion cannot safely remove your verification evidence right now.' }); return;
+  }
+  try {
+    await Promise.all(evidenceKeys.map(key => deletePrivateVerificationObject(key)));
+  } catch {
+    res.status(503).json({ message: 'Private verification evidence could not be deleted. Your account has not been removed; try again later.' }); return;
+  }
   await prisma.$transaction([
     prisma.auditLog.create({ data: { actorId: user.id, action: 'ACCOUNT_DELETED', entityType: 'User', entityId: user.id, details: 'Self-service deletion confirmed by phone OTP.' } }),
     prisma.user.delete({ where: { id: user.id } }),
