@@ -18,7 +18,7 @@ marketplaceRouter.get('/my-properties', allowRoles(UserRole.LANDLORD, UserRole.A
 
 marketplaceRouter.get('/favorites', allowRoles(UserRole.TENANT, UserRole.LANDLORD, UserRole.AGENT), asyncHandler(async (req, res) => {
   const data = await prisma.favorite.findMany({
-    where: { userId: req.auth!.userId, property: { status: PropertyStatus.PUBLISHED, available: true } },
+    where: { userId: req.auth!.userId, property: { status: PropertyStatus.PUBLISHED, available: true, owner: { isActive: true } } },
     include: { property: { include: { images: { orderBy: { sortOrder: 'asc' } } } } },
     orderBy: { createdAt: 'desc' },
   });
@@ -26,7 +26,7 @@ marketplaceRouter.get('/favorites', allowRoles(UserRole.TENANT, UserRole.LANDLOR
 }));
 
 marketplaceRouter.post('/favorites/:propertyId', allowRoles(UserRole.TENANT, UserRole.LANDLORD, UserRole.AGENT), asyncHandler(async (req, res) => {
-  const property = await prisma.property.findFirst({ where: { id: req.params.propertyId, status: PropertyStatus.PUBLISHED, available: true }, select: { id: true } });
+  const property = await prisma.property.findFirst({ where: { id: req.params.propertyId, status: PropertyStatus.PUBLISHED, available: true, owner: { isActive: true } }, select: { id: true } });
   if (!property) { res.status(404).json({ message: 'Available property not found.' }); return; }
   await prisma.favorite.upsert({
     where: { userId_propertyId: { userId: req.auth!.userId, propertyId: property.id } },
@@ -51,7 +51,7 @@ marketplaceRouter.post('/viewings', allowRoles(UserRole.TENANT), asyncHandler(as
   if (!parsed.success) { res.status(400).json({ message: 'Invalid viewing request.', errors: parsed.error.flatten() }); return; }
   const preferredAt = new Date(parsed.data.preferredAt);
   if (preferredAt <= new Date()) { res.status(400).json({ message: 'Choose a future viewing date and time.' }); return; }
-  const property = await prisma.property.findFirst({ where: { id: parsed.data.propertyId, status: PropertyStatus.PUBLISHED, available: true }, select: { id: true, ownerId: true, title: true } });
+  const property = await prisma.property.findFirst({ where: { id: parsed.data.propertyId, status: PropertyStatus.PUBLISHED, available: true, owner: { isActive: true } }, select: { id: true, ownerId: true, title: true } });
   if (!property) { res.status(404).json({ message: 'This property is no longer available.' }); return; }
   if (property.ownerId === req.auth!.userId) { res.status(400).json({ message: 'You cannot request a viewing for your own property.' }); return; }
   const duplicate = await prisma.viewingRequest.findFirst({ where: { tenantId: req.auth!.userId, propertyId: property.id, status: { in: [ViewingStatus.REQUESTED, ViewingStatus.ACCEPTED] } } });
