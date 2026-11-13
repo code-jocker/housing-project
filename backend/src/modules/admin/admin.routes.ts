@@ -63,7 +63,7 @@ adminRouter.get('/verifications/properties', asyncHandler(async (_req, res) => {
     where: { status: VerificationStatus.PENDING },
     include: {
       property: { select: { id: true, title: true, district: true, sector: true, monthlyRentRwf: true, status: true } },
-      owner: { select: { id: true, fullName: true, phone: true, role: true } },
+      owner: { select: { id: true, fullName: true, phone: true, role: true, identityVerification: { select: { status: true } } } },
     },
     orderBy: { submittedAt: 'asc' },
   });
