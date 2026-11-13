@@ -16,6 +16,11 @@ const schema = z.object({
   CLOUDINARY_API_KEY: z.string().optional(),
   CLOUDINARY_API_SECRET: z.string().optional(),
   CLOUDINARY_UPLOAD_PRESET: z.string().optional(),
+  PRIVATE_STORAGE_ENDPOINT: z.string().url().optional(),
+  PRIVATE_STORAGE_REGION: z.string().optional(),
+  PRIVATE_STORAGE_BUCKET: z.string().optional(),
+  PRIVATE_STORAGE_ACCESS_KEY_ID: z.string().optional(),
+  PRIVATE_STORAGE_SECRET_ACCESS_KEY: z.string().optional(),
 });
 
 const parsed = schema.safeParse(process.env);
