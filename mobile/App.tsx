@@ -61,6 +61,17 @@ export default function App() {
     const timer = setTimeout(() => {
       setLoadingListings(true);
       setCurrentPage(1);
+      if (showSaved) {
+        getFavorites().then(items => {
+          if (!active) return;
+          setListingData(items.map(item => ({ id: item.id, title: item.title, district: item.district, sector: item.sector, rent: item.monthlyRentRwf, bedrooms: item.bedrooms, bathrooms: item.bathrooms, type: item.propertyType as Property['type'], image: item.images[0]?.url || properties[0].image, verified: Boolean(item.verifiedAt), available: item.available, furnished: item.furnished, description: item.description })));
+          setTotalPages(1);
+          setApiMessage('Your saved properties');
+        }).catch(error => {
+          if (active) setApiMessage(error instanceof Error ? error.message : 'Could not load saved properties.');
+        }).finally(() => { if (active) setLoadingListings(false); });
+        return;
+      }
       getPropertiesPage({
         q: query.trim().length >= 2 ? query.trim() : undefined,
         type: filter !== 'All' && filter !== 'Verified' ? filter : undefined,
@@ -81,10 +92,10 @@ export default function App() {
       }).finally(() => { if (active) setLoadingListings(false); });
     }, 300);
     return () => { active = false; clearTimeout(timer); };
-  }, [query, filter, demoMode]);
+  }, [query, filter, demoMode, showSaved]);
   const filtered = useMemo(() => listingData.filter(p => {
     const q = query.trim().toLowerCase();
-    const matchesQuery = !q || `${p.title} ${p.district} ${p.sector} ${p.type}`.toLowerCase().includes(q);
+    const matchesQuery = !q || `${p.title} ${p.description} ${p.district} ${p.sector} ${p.type}`.toLowerCase().includes(q);
     const matchesFilter = filter === 'All' || (filter === 'Verified' ? p.verified : p.type === filter);
     return matchesQuery && matchesFilter && p.available && (!showSaved || saved.includes(p.id));
   }), [listingData, query, filter, showSaved, saved]);
@@ -116,7 +127,7 @@ export default function App() {
     }
   };
   const onAuthenticated = async (account: AuthUser) => { setUser(account); setAuthVisible(false); try { const items = await getFavorites(); setSaved(items.map(item => item.id)); } catch { setSaved([]); } };
-  const onLogout = async () => { await logout(); setUser(null); setSaved([]); setAuthVisible(false); };
+  const onLogout = async () => { await logout(); setUser(null); setSaved([]); setShowSaved(false); setAuthVisible(false); };
 
   if (selected) return (
     <>
